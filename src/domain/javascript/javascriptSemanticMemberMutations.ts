@@ -67,7 +67,10 @@ import {
   semanticScopeExitEffect,
 } from "./javascriptSemanticMutationInitializers.js";
 import { semanticCoercionOperands } from "./javascriptSemanticLanguageInvocations.js";
-import { SEMANTIC_ALIAS_SELECTION_LIMIT } from "./javascriptSemanticResourceLimits.js";
+import {
+  SEMANTIC_ALIAS_SELECTION_LIMIT,
+  SEMANTIC_MEMBER_MUTATION_WORK_LIMIT,
+} from "./javascriptSemanticResourceLimits.js";
 import {
   semanticKnownArrayIteration,
   semanticReferenceSourcesInactive,
@@ -357,6 +360,23 @@ export function* collectSemanticMemberMutationsSteps(
   const deferredMapReceivers = new Set<
     t.CallExpression | t.OptionalCallExpression
   >();
+  // One pass-wide work budget bounds the whole indexing pass. The per-query
+  // alias limits bound a single walk, but retained effects, dedup keys and
+  // coverage antichains otherwise grow superlinearly on bundle-scale sources
+  // and exhaust any heap before the caller's deadline can report partial
+  // facts. Exhaustion keeps the effects recorded so far, reports the bound
+  // through the state's resource limits, and leaves completeness unset so
+  // unindexed effects remain unknown rather than absent.
+  let workUnits = 0;
+  let workExhausted = false;
+  const spendWork = (units: number): boolean => {
+    if (workExhausted) return false;
+    workUnits += units;
+    if (workUnits <= SEMANTIC_MEMBER_MUTATION_WORK_LIMIT) return true;
+    workExhausted = true;
+    state.valueResourceLimits.add("member-mutation-work");
+    return false;
+  };
   // The binding pass already retained callable nodes. Ordinary data-only code
   // must not pay an alias walk for every member read or assignment.
   const accessorKeys = {
@@ -399,6 +419,7 @@ export function* collectSemanticMemberMutationsSteps(
         path: selected,
         lookup: selectedLookup,
       } = pending[cursor]!;
+      if (!spendWork(4)) return effects;
       const identity = JSON.stringify([
         selectedRoot.start,
         selectedRoot.end,
@@ -858,6 +879,7 @@ export function* collectSemanticMemberMutationsSteps(
     for (let cursor = 0; cursor < pending.length; cursor++) {
       const current = pending[cursor];
       if (current === undefined) break;
+      if (!spendWork(16)) return;
       if (
         (current.exactKey !== undefined &&
           joinedProjections.get(current.exactKey)?.scheduled === true) ||
@@ -1503,6 +1525,7 @@ export function* collectSemanticMemberMutationsSteps(
     for (let cursor = 0; cursor < pending.length; cursor++) {
       const value = pending[cursor];
       if (value === undefined) break;
+      if (!spendWork(4)) break;
       const node = unwrapJavaScriptExpression(value.node).node;
       if (!t.isNode(node) || retainEscapedLeaf(value, node, leaves, identities))
         continue;
@@ -1577,6 +1600,7 @@ export function* collectSemanticMemberMutationsSteps(
   const writeOnlyMembers = new WeakSet<t.Node>();
   yield* traverseJavaScriptValueAstSteps(program, state.erasedSyntaxNodes, {
     enter: (node, parent, readAncestors) => {
+      if (workExhausted) return;
       const writeTarget = semanticWriteSiteTarget(node);
       if (writeTarget !== null && !semanticWriteSiteReadsFirst(node))
         for (const target of semanticWriteTargets(writeTarget))
@@ -1704,15 +1728,17 @@ export function* collectSemanticMemberMutationsSteps(
   // A later effect can make a previously defined destructuring source uncertain.
   // Reconsider defaults and iterable origins until their effects are stable.
   while (
-    pendingReferences.length > 0 ||
-    iterableReferences.length > 0 ||
-    deferredMapReceivers.size > 0
+    !workExhausted &&
+    (pendingReferences.length > 0 ||
+      iterableReferences.length > 0 ||
+      deferredMapReceivers.size > 0)
   ) {
     const effectsBefore = recordedEffectCount;
     const iterablesBefore = iterableReferences.length;
     const iterationBefore: boolean = state.arrayIterationUnknown;
     for (const [index, reference] of pendingReferences.splice(0).entries()) {
       if (index % 64 === 0) yield;
+      if (!spendWork(4)) break;
       const { initializer } = reference;
       if (semanticReferenceSourcesInactive(initializer, state))
         pendingReferences.push(reference);
@@ -1782,6 +1808,7 @@ export function* collectSemanticMemberMutationsSteps(
     }
     for (const [index, reference] of [...iterableReferences].entries()) {
       if (index % 64 === 0) yield;
+      if (!spendWork(4)) break;
       if (semanticReferenceSourcesInactive(reference, state)) continue;
       if (reference.iterationOnly) {
         const expanded = expandedIterationReferences(reference, state);
@@ -1815,6 +1842,7 @@ export function* collectSemanticMemberMutationsSteps(
     let receiverIndex = 0;
     for (const node of deferredMapReceivers) {
       if (receiverIndex++ % 64 === 0) yield;
+      if (!spendWork(4)) break;
       if (
         isIntrinsicMapLookup(node, state, { referenceMayHaveChangedAt }) ===
         true

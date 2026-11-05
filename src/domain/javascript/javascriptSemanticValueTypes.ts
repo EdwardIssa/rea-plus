@@ -10,6 +10,7 @@ export const javaScriptSemanticResourceLimitSchema = z.enum([
   "expression-depth",
   "getter-expansion",
   "alias-selections",
+  "member-mutation-work",
 ]);
 
 /** Resource-limit classifications shared by static facts and semantic values. */

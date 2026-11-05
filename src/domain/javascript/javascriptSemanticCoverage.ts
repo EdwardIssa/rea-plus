@@ -7,6 +7,7 @@ import {
   SEMANTIC_ALIAS_SELECTION_LIMIT,
   SEMANTIC_PRIMITIVE_CANDIDATE_LIMIT,
   SEMANTIC_PRIMITIVE_JSON_BYTES_LIMIT,
+  SEMANTIC_MEMBER_MUTATION_WORK_LIMIT,
 } from "./javascriptSemanticResourceLimits.js";
 
 /** Exact retention state for one callable's direct returns. */
@@ -94,6 +95,10 @@ const semanticResourceBounds: Record<
   },
   "alias-selections": {
     value: SEMANTIC_ALIAS_SELECTION_LIMIT,
+    unit: "items",
+  },
+  "member-mutation-work": {
+    value: SEMANTIC_MEMBER_MUTATION_WORK_LIMIT,
     unit: "items",
   },
 };

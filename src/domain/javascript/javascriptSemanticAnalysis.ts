@@ -40,14 +40,12 @@ import {
   semanticWriteSiteTarget,
   unwrapJavaScriptExpression,
 } from "./javascriptAstValues.js";
-import type {
-  JavaScriptSemanticAnalysisState,
-  JavaScriptSemanticBindingState,
-  JavaScriptSemanticScopeState,
-  JavaScriptBindingIndex,
-  JavaScriptSemanticReferenceEffectsAtSite,
-} from "./javascriptSemanticState.js";
 import {
+  type JavaScriptSemanticAnalysisState,
+  type JavaScriptSemanticBindingState,
+  type JavaScriptSemanticScopeState,
+  type JavaScriptBindingIndex,
+  type JavaScriptSemanticReferenceEffectsAtSite,
   currentSemanticScope,
   semanticPrototypeOwners,
   type SemanticPrototypeOwner,
@@ -231,7 +229,11 @@ function* indexSemanticMemberMutationFactsSteps(
     (site, reference, path) =>
       referenceEffectsMayHaveChanged(state, site, reference, path),
   );
-  state.memberMutationFactsComplete = true;
+  // A work-bounded pass retains partial effects; completeness must stay
+  // unset so consumers keep treating unindexed effects as unknown.
+  state.memberMutationFactsComplete = !state.valueResourceLimits.has(
+    "member-mutation-work",
+  );
   indexedMemberMutationStates.add(state);
   invalidateSemanticRequireDelegateWrites(state);
 }
