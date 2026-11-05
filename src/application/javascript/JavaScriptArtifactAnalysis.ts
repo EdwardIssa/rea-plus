@@ -202,9 +202,11 @@ export const analyzeAndAdoptJavaScriptArtifactFiles = async (
       }
       if (
         error !== null &&
-        (!(error instanceof AnalysisResourceConstraintError) ||
-          error.reportedLimits?.parent_result_budget_exhausted === true)
+        !(error instanceof AnalysisResourceConstraintError)
       ) {
+        // Resource-constraint failures degrade per file: the file's retained
+        // facts and its failure record stay in the result, and later sources
+        // still run. Only non-resource errors interrupt the operation.
         interruption = error;
         break;
       }

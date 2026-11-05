@@ -138,6 +138,12 @@ export class JavaScriptAnalysisWorker {
   #nextSourceIndex = 0;
   #applicationProjectionFailure: AnalysisResourceConstraintError | undefined;
   #parentCapacityExhaustion: Readonly<Record<string, number>> | undefined;
+  /** Whether this run already reported its one budget-exhaustion failure. */
+  #capacityExhaustionServed = false;
+  /** First source whose retention tripped the parent capacity, if any. */
+  #truncationCursor:
+    | { readonly sourceIndex: number; readonly path: string }
+    | undefined;
   #sourcesRemaining: number | undefined;
   #deadline: ProviderStartupDeadline | undefined;
   #resultBudgetBytes = 0;
@@ -257,6 +263,8 @@ export class JavaScriptAnalysisWorker {
     this.#revokedStaticProjections = [];
     this.#nextSourceIndex = 0;
     this.#parentCapacityExhaustion = undefined;
+    this.#capacityExhaustionServed = false;
+    this.#truncationCursor = undefined;
     this.#applicationProjectionFailure = undefined;
     this.#refreshResultBudget();
     return true;
@@ -399,8 +407,11 @@ export class JavaScriptAnalysisWorker {
             sourceIndex,
             response,
           );
-          const exhausted = this.#parentCapacityFailure(file.path);
-          if (exhausted !== undefined) throw exhausted;
+          const capacityFailure = this.#parentCapacityFailure(
+            file.path,
+            sourceIndex,
+          );
+          if (capacityFailure !== undefined) throw capacityFailure;
           offeredResultBudget =
             this.#applicationProjectionFailure !== undefined &&
             this.#sourcesRemaining !== undefined &&
@@ -889,8 +900,34 @@ export class JavaScriptAnalysisWorker {
 
   #parentCapacityFailure(
     path: string,
+    sourceIndex: number,
   ): AnalysisResourceConstraintError | undefined {
     if (this.#parentCapacityExhaustion === undefined) return undefined;
+    if (this.#capacityExhaustionServed) {
+      // The run already reported its one exhaustion failure. Later sources
+      // still complete with their static facts retained; only the expanded
+      // relationship projection is truncated, and the resume cursor names
+      // the first truncated source so a follow-up run can cover the rest.
+      const cursor = this.#truncationCursor;
+      return new AnalysisResourceConstraintError(
+        OPERATION,
+        "memory",
+        `The parent's result capacity was exhausted after retaining static facts for ${cursor?.path ?? path}; static facts for ${path} were retained, but expanded application relationships were truncated`,
+        {
+          ...this.#limits(),
+          parent_result_budget_bytes: this.#resultBudgetBytes,
+          ...this.#parentCapacityExhaustion,
+          parent_result_budget_truncated: true,
+          resume_source_index: cursor?.sourceIndex ?? sourceIndex,
+          resume_source_path: cursor?.path ?? path,
+        },
+        {
+          remediationAction: JAVASCRIPT_PARENT_RESULT_BUDGET_REMEDIATION,
+        },
+      );
+    }
+    this.#capacityExhaustionServed = true;
+    this.#truncationCursor = { sourceIndex, path };
     return new AnalysisResourceConstraintError(
       OPERATION,
       "memory",
