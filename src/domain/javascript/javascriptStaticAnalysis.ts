@@ -243,8 +243,17 @@ const finalizeStaticAnalysis = (
     },
     applicability: { electron: electronObserved ? "observed" : "unknown" },
   };
-  const metroLocation = accumulator.metroRegistrationLocation;
-  if (accumulator.metroModules.length > 0 && metroLocation !== null)
+  // A shard holding only the runtime prelude observes entry invocations but
+  // no definitions; emit its registration too so per-shard merges keep the
+  // entry keys a whole-file pass would report.
+  const metroLocation =
+    accumulator.metroRegistrationLocation ??
+    accumulator.metroFirstEntryLocation;
+  if (
+    (accumulator.metroModules.length > 0 ||
+      accumulator.metroEntryModuleKeys.length > 0) &&
+    metroLocation !== null
+  )
     accumulator.registrations.push({
       bundler: "metro",
       runtime: "metro",

@@ -88,6 +88,8 @@ export interface JavaScriptAnalysisAccumulator {
   metroUnknownAsyncChunkKeys: number;
   metroFirstDefineStart: number | null;
   metroRegistrationLocation: JavaScriptSourceRange | null;
+  /** First `__r(...)` entry call seen; anchors an entry-only registration. */
+  metroFirstEntryLocation: JavaScriptSourceRange | null;
   readonly browserWindows: LocatedJavaScriptFinding<ElectronBrowserWindowFinding>[];
   readonly pendingBrowserWindows: t.NewExpression[];
   readonly contextBridgeApis: LocatedJavaScriptFinding<ElectronContextBridgeFinding>[];
@@ -191,6 +193,7 @@ export const createJavaScriptAnalysisAccumulator = (
   metroUnknownAsyncChunkKeys: 0,
   metroFirstDefineStart: null,
   metroRegistrationLocation: null,
+  metroFirstEntryLocation: null,
   browserWindows: [],
   pendingBrowserWindows: [],
   contextBridgeApis: [],

@@ -292,6 +292,8 @@ export const inspectMetroEntryCall = (
     return;
   const key = argumentValue(call.arguments[0]);
   if (key !== undefined) accumulator.metroEntryModuleKeys.push(key);
+  if (accumulator.metroFirstEntryLocation === null)
+    accumulator.metroFirstEntryLocation = range(call);
 };
 
 interface RecoveredBundlerModules {
