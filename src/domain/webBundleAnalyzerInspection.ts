@@ -99,6 +99,7 @@ export const analyzeScript = (
     script.source.artifact.text,
     receivers.rpcClientRoots,
     index,
+    receivers.genericRpcClientRoots,
   );
   traverseJavaScriptAst(file, {
     enter: (node, parent) => {

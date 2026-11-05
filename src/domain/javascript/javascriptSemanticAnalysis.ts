@@ -115,7 +115,10 @@ import {
   type ParsedJavaScriptSource,
 } from "./javascriptSourceParser.js";
 
-import { isJavaScriptRpcClientFactory } from "./javascriptRpcEndpoints.js";
+import {
+  isGenericRpcClientFactory,
+  isJavaScriptRpcClientFactory,
+} from "./javascriptRpcEndpoints.js";
 import { createSemanticModuleInterop } from "./javascriptModuleInterop.js";
 import {
   SemanticPropertyPathCoverage,
@@ -522,6 +525,12 @@ export type { JavaScriptOpenReceiverFact } from "./javascriptSemanticReceiverFac
 export interface JavaScriptReceiverFacts {
   readonly openReceivers: ReadonlyMap<number, JavaScriptOpenReceiverFact>;
   readonly rpcClientRoots: ReadonlySet<t.Node>;
+  /**
+   * Roots proven only to the generic `.rpc()` client standard (a createClient
+   * binding, a destructured client member, or a module-namespace member
+   * assigned a client). Endpoints through these roots are candidates.
+   */
+  readonly genericRpcClientRoots: ReadonlySet<t.Node>;
 }
 
 export interface JavaScriptReceiverIndex extends JavaScriptBindingIndex {
@@ -606,7 +615,73 @@ function* classifyDefinitionReceiversSteps(
   const facts = new Map<number, JavaScriptOpenReceiverFact>();
   const extensionStateReads: number[] = [];
   const roots = new Set<t.Node>();
+  const genericRoots = new Set<t.Node>();
   const clients = new Map<string, boolean>();
+  const genericClients = new Map<string, boolean>();
+  // Property names proven to hold an RPC client somewhere in this program:
+  // a member assignment or object property whose value is a client factory
+  // call (the shape bundled modules use to publish a client as an export,
+  // e.g. `exports.supabase = createClient(url, key)`).
+  const clientMembers = new Set<string>();
+  // Member reads on identifier roots, deferred until every client member
+  // assignment in the program has been seen.
+  const namespaceReads: {
+    readonly root: t.Node;
+    readonly member: string;
+    readonly binding: JavaScriptSemanticBindingState;
+  }[] = [];
+  const collectClientMember = (node: t.Node): void => {
+    if (t.isAssignmentExpression(node) && node.operator === "=") {
+      const left = unwrapJavaScriptExpression(node.left).node;
+      if (!t.isMemberExpression(left) && !t.isOptionalMemberExpression(left))
+        return;
+      const key = semanticStaticPropertyKey(left.property, left.computed);
+      if (
+        key !== null &&
+        (isJavaScriptRpcClientFactory(node.right) ||
+          isGenericRpcClientFactory(node.right))
+      )
+        clientMembers.add(key);
+      return;
+    }
+    if (t.isObjectProperty(node)) {
+      const key = semanticStaticPropertyKey(node.key, node.computed);
+      if (
+        key !== null &&
+        (isJavaScriptRpcClientFactory(node.value) ||
+          isGenericRpcClientFactory(node.value))
+      )
+        clientMembers.add(key);
+    }
+  };
+  // Whether a binding's stable initializer loads a module: an import binding,
+  // a plain or bundled require call, or a call through a parameter (the shape
+  // of a bundler factory's require parameter, e.g. Metro's `_r(id)`).
+  const moduleLinkedInitializer = (
+    binding: JavaScriptSemanticBindingState,
+  ): boolean => {
+    if (binding.directOrigins.length > 0) return true;
+    const initializer = semanticStableInitializer(binding, state);
+    if (initializer === undefined) return false;
+    if (semanticRequireOrigin(initializer.node, state) !== undefined)
+      return true;
+    if (semanticBundledRequireOrigin(initializer.node, state) !== undefined)
+      return true;
+    const call = unwrapJavaScriptExpression(initializer.node).node;
+    if (!t.isCallExpression(call) && !t.isOptionalCallExpression(call))
+      return false;
+    const callee = unwrapJavaScriptExpression(call.callee).node;
+    if (!t.isIdentifier(callee)) return false;
+    const calleeBinding = resolveSemanticBindingState(
+      state,
+      callee,
+      callee.name,
+    );
+    return (
+      calleeBinding !== undefined &&
+      calleeBinding.definitions.some(({ kind }) => kind === "parameter")
+    );
+  };
   const classifyRpcRoot = (node: t.Node): void => {
     if (!t.isMemberExpression(node) && !t.isOptionalMemberExpression(node))
       return;
@@ -624,6 +699,42 @@ function* classifyDefinitionReceiversSteps(
       clients.set(binding.bindingId, client);
     }
     if (client) roots.add(root);
+    let generic = genericClients.get(binding.bindingId);
+    if (generic === undefined) {
+      const initializer = semanticStableInitializer(binding, state);
+      generic =
+        initializer !== undefined &&
+        ((initializer.projection.length === 0 &&
+          isGenericRpcClientFactory(initializer.node)) ||
+          // A destructured client member: `const { supabase } = require(...)`
+          // where a `supabase` member elsewhere holds a client factory result.
+          (initializer.projection.length === 1 &&
+            typeof initializer.projection[0] === "string" &&
+            clientMembers.has(initializer.projection[0]) &&
+            moduleLinkedInitializer(binding)));
+      genericClients.set(binding.bindingId, generic);
+    }
+    if (generic) genericRoots.add(root);
+    // A module namespace member that holds a client (`client.supabase`) is
+    // decided after the traversal: the assignment that proves the member
+    // holds a client may appear later in the program than this read. Only
+    // roots that could load a module are deferred, so ordinary member reads
+    // cost nothing here.
+    const member = semanticStaticPropertyKey(node.property, node.computed);
+    if (member !== null) {
+      const initializer = semanticStableInitializer(binding, state);
+      const call =
+        initializer === undefined
+          ? undefined
+          : unwrapJavaScriptExpression(initializer.node).node;
+      if (
+        binding.directOrigins.length > 0 ||
+        (initializer !== undefined &&
+          initializer.projection.length === 0 &&
+          (t.isCallExpression(call) || t.isOptionalCallExpression(call)))
+      )
+        namespaceReads.push({ root, member, binding });
+    }
   };
   const classifyOpenReceiver = (node: t.Node): void => {
     if (!t.isCallExpression(node) && !t.isOptionalCallExpression(node)) return;
@@ -706,14 +817,33 @@ function* classifyDefinitionReceiversSteps(
   };
   yield* traverseJavaScriptValueAstSteps(program, state.erasedSyntaxNodes, {
     enter: (node) => {
+      collectClientMember(node);
       classifyRpcRoot(node);
       classifyOpenReceiver(node);
     },
   });
+  // Deferred namespace-member classification: `client.supabase` counts as a
+  // generic RPC client root when this program assigns a client factory
+  // result to a `supabase` member of some exports object and the root loads
+  // a module (an import binding or a require-shaped initializer).
+  const moduleLinked = new Map<string, boolean>();
+  for (const { root, member, binding } of namespaceReads) {
+    if (!clientMembers.has(member)) continue;
+    let linked = moduleLinked.get(binding.bindingId);
+    if (linked === undefined) {
+      linked = moduleLinkedInitializer(binding);
+      moduleLinked.set(binding.bindingId, linked);
+    }
+    if (linked) genericRoots.add(root);
+  }
   if (extensionStateReads.length > 0 && importsVsCodeModule(state))
     for (const start of extensionStateReads)
       facts.set(start, "extension-state");
-  return { openReceivers: facts, rpcClientRoots: roots };
+  return {
+    openReceivers: facts,
+    rpcClientRoots: roots,
+    genericRpcClientRoots: genericRoots,
+  };
 }
 
 /** VS Code passes extension state through ExtensionContext, not an import. */

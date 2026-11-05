@@ -4,6 +4,8 @@ import type * as t from "@babel/types";
 export interface JavaScriptRpcEndpoint {
   readonly value: string;
   readonly mechanism: string;
+  /** Set when the client identity behind the call was inferred, not proven. */
+  readonly interpretation?: "candidate";
 }
 
 /** Feed every AST node in pre-order, then drain finish() for Source findings. */

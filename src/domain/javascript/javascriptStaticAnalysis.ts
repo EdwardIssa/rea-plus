@@ -135,7 +135,12 @@ export function* analyzeParsedJavaScriptStaticSourceSteps(
     electronExportIntact: electronIdentity.intactExport,
     electronInvocationPath: electronIdentity.invocationPath,
     electronAppPathChangePossible: electronIdentity.mayChangeAppPath,
-    rpcScan: createJavaScriptRpcScan(source, receivers.rpcClientRoots, index),
+    rpcScan: createJavaScriptRpcScan(
+      source,
+      receivers.rpcClientRoots,
+      index,
+      receivers.genericRpcClientRoots,
+    ),
     expressionShapes: createSemanticExpressionShapeResolver(bindings),
   };
   const routeScan = yield* JavaScriptRouteScan.createSteps(

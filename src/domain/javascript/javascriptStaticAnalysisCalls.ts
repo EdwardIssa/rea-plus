@@ -845,6 +845,31 @@ export function* finishRpcScanSteps(
   }
 }
 
+/**
+ * Resolve a call argument to a string when it is a literal or an identifier
+ * whose binding has one stable string-literal initializer and is never
+ * reassigned (the `const key = 'name'` shape bundlers preserve). Anything
+ * else stays unknown rather than guessed.
+ */
+const constBoundStringValue = (
+  argument: t.Node | undefined,
+  bindings: JavaScriptSemanticAnalysisState,
+): string | undefined => {
+  const literal = stringValue(argument);
+  if (literal !== undefined) return literal;
+  if (argument === undefined || !t.isIdentifier(argument)) return undefined;
+  const binding = resolveSemanticBindingState(
+    bindings,
+    argument,
+    argument.name,
+  );
+  if (binding === undefined || binding.mutable) return undefined;
+  const initializer = semanticStableInitializer(binding, bindings);
+  if (initializer === undefined || initializer.projection.length !== 0)
+    return undefined;
+  return stringValue(initializer.node);
+};
+
 const inspectStorageCall = (
   node: JavaScriptCallLike,
   name: string,
@@ -868,6 +893,10 @@ const inspectStorageCall = (
           ? "cache-storage"
           : browserStorageKind(node.callee, bindings);
   if (storage === undefined) return;
+  // Storage keys are often bound through a const (`const key = 'name'`);
+  // propagate the literal so the key is reported instead of unknown.
+  if (first === undefined)
+    first = constBoundStringValue(node.arguments[0], bindings);
   addLocatedFinding(context, {
     collection: context.accumulator.storage,
     key: `storage\0${storage}\0${first ?? ""}`,
