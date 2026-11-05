@@ -80,7 +80,7 @@ it("counts a definition whose module key is not a literal as unknown", () => {
     __d(function(g, r, i, a, m, e, d) { m.exports = 1; }, dynamicId, []);
   `);
   expect(result.bundler_registrations).toHaveLength(0);
-  expect(result.analysis_coverage.semantics.unknown_findings).toBeGreaterThan(
+  expect(result.analysis_coverage!.semantics.unknown_findings).toBeGreaterThan(
     0,
   );
 });
