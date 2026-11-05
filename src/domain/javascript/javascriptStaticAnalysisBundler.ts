@@ -201,6 +201,99 @@ export const inspectEsbuildWrapper = (
   );
 };
 
+/**
+ * Inspect one Metro module definition call (`__d(factory, id, deps)`).
+ * Metro defines modules one call at a time instead of one table, so modules
+ * accumulate in the accumulator and finalize emits a single registration.
+ */
+export const inspectMetroModuleDefinition = (
+  source: string,
+  call: t.CallExpression,
+  accumulator: AnalysisAccumulator,
+  bindings: JavaScriptSemanticAnalysisState,
+): void => {
+  if (!t.isIdentifier(call.callee) || call.callee.name !== "__d") return;
+  // The define global is supplied by the Metro runtime prelude. A locally
+  // bound `__d` is application code, not a module definition.
+  if (
+    resolveSemanticBindingState(bindings, call.callee, call.callee.name) !==
+    undefined
+  )
+    return;
+  const factory = call.arguments[0];
+  if (!isBundlerFunction(factory)) return;
+  const key = argumentValue(call.arguments[1]);
+  if (key === undefined) {
+    accumulator.unknownFindings += 1;
+    return;
+  }
+  const runtime = "metro";
+  const fingerprint = fingerprintJavaScriptAst(factory);
+  const roles = javascriptBundlerFactoryRoles(factory, runtime);
+  // An inexact role pattern leaves this module's export list incomplete.
+  if (!roles.exact) accumulator.unknownFindings += 1;
+  for (const unused of roles.unusedDefaults)
+    accumulator.unusedFactoryDefaults.add(unused);
+  const exports: string[] = [];
+  accumulator.pendingBundlerExports.push({ factory, roles, exports });
+  const loader = roles.loader;
+  const requireName = loader?.name ?? null;
+  const requireBindingId =
+    loader === undefined
+      ? null
+      : (resolveSemanticBindingState(bindings, loader, loader.name)
+          ?.bindingId ?? null);
+  if (requireBindingId !== null)
+    accumulator.factoryRequireBindingIds.add(requireBindingId);
+  const asyncChunks = collectBundlerAsyncChunkKeys(
+    factory,
+    requireBindingId,
+    bindings,
+    roles.unusedDefaults,
+  );
+  addFindingOnce(accumulator, `metro-module\0${key}`, () => {
+    if (typeof factory.start === "number" && typeof factory.end === "number")
+      accumulator.moduleRangeIndex.add({
+        start: factory.start,
+        end: factory.end,
+        key,
+        runtime,
+        requireName,
+      });
+    accumulator.metroModules.push({
+      module_key: key,
+      factory_require_name: requireName,
+      source_sha256: sha256Text(sourceSlice(source, factory)),
+      structural_fingerprint_sha256: fingerprint,
+      structural_fingerprint_algorithm: JAVASCRIPT_AST_FINGERPRINT_ALGORITHM,
+      exports,
+      location: range(factory),
+    });
+    accumulator.metroAsyncChunkKeys.push(...asyncChunks.values);
+    accumulator.metroUnknownAsyncChunkKeys += asyncChunks.unknown;
+    if (accumulator.metroFirstDefineStart === null) {
+      accumulator.metroFirstDefineStart = call.start ?? null;
+      accumulator.metroRegistrationLocation = range(call);
+    }
+  });
+};
+
+/** Record a Metro entry invocation (`__r(id)`) issued by the runtime prelude. */
+export const inspectMetroEntryCall = (
+  call: t.CallExpression,
+  accumulator: AnalysisAccumulator,
+  bindings: JavaScriptSemanticAnalysisState,
+): void => {
+  if (!t.isIdentifier(call.callee) || call.callee.name !== "__r") return;
+  if (
+    resolveSemanticBindingState(bindings, call.callee, call.callee.name) !==
+    undefined
+  )
+    return;
+  const key = argumentValue(call.arguments[0]);
+  if (key !== undefined) accumulator.metroEntryModuleKeys.push(key);
+};
+
 interface RecoveredBundlerModules {
   readonly modules: JavaScriptBundlerModule[];
   readonly asyncChunkKeys: readonly string[];

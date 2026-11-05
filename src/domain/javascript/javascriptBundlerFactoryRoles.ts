@@ -30,13 +30,21 @@ export interface JavaScriptBundlerFactoryRoles {
 
 type FactoryRole = "module" | "exports" | "loader";
 
-/** Positional factory roles of a recognized bundler runtime. */
-const roleOrder = (runtime: string): readonly FactoryRole[] =>
+/**
+ * Positional factory roles of a recognized bundler runtime, indexed by
+ * parameter position; positions without a role stay undefined. Webpack
+ * factories receive (module, exports, require); Metro factories receive
+ * (global, require, importDefault, importAll, module, exports, deps), so
+ * only positions 1, 4 and 5 carry roles.
+ */
+const roleOrder = (runtime: string): readonly (FactoryRole | undefined)[] =>
   runtime === "esbuild-commonjs"
     ? ["exports", "module"]
     : runtime.startsWith("esbuild-")
       ? []
-      : ["module", "exports", "loader"];
+      : runtime === "metro"
+        ? [undefined, "loader", undefined, undefined, "module", "exports"]
+        : ["module", "exports", "loader"];
 
 /** Bind a factory's role parameters by position, never by spelling. */
 export const javascriptBundlerFactoryRoles = (
@@ -60,6 +68,7 @@ export const javascriptBundlerFactoryRoles = (
     return undefined;
   };
   for (const [index, role] of roleOrder(runtime).entries()) {
+    if (role === undefined) continue;
     const parameter = parameters[index];
     if (parameter === undefined) break;
     // A rest element collects this and every later argument into an array.

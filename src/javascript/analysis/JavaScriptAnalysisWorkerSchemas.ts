@@ -389,7 +389,7 @@ export const javaScriptWorkerStaticAnalysisSchema = z
     ),
     bundler_registrations: z.array(
       z.strictObject({
-        bundler: z.enum(["webpack", "rspack", "esbuild"]),
+        bundler: z.enum(["webpack", "rspack", "esbuild", "metro"]),
         runtime: z.string(),
         chunk_keys: strings,
         unknown_chunk_keys: count,
