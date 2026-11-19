@@ -13,6 +13,9 @@ import type {
   JavaScriptStaticAnalysis,
   JavaScriptStaticEndpoint,
   JavaScriptStaticReference,
+  JavaScriptStaticRpcCandidate,
+  JavaScriptStaticRpcClientMember,
+  JavaScriptStaticRpcExportProvenance,
   JavaScriptStaticStorage,
 } from "./javascriptStaticAnalysisTypes.js";
 import type {
@@ -62,6 +65,9 @@ export interface JavaScriptAnalysisAccumulator {
   electronCallPathLimitReached?: boolean;
   readonly references: LocatedJavaScriptFinding<JavaScriptStaticReference>[];
   readonly endpoints: LocatedJavaScriptFinding<JavaScriptStaticEndpoint>[];
+  readonly rpcCandidates: LocatedJavaScriptFinding<JavaScriptStaticRpcCandidate>[];
+  readonly rpcClientMembers: LocatedJavaScriptFinding<JavaScriptStaticRpcClientMember>[];
+  readonly rpcExportProvenance: LocatedJavaScriptFinding<JavaScriptStaticRpcExportProvenance>[];
   /** Target and receiver identities awaiting the shared mutation index. */
   readonly pendingNetworkCalls: {
     readonly node:
@@ -181,6 +187,9 @@ export const createJavaScriptAnalysisAccumulator = (
   appPathChanges: [],
   references: [],
   endpoints: [],
+  rpcCandidates: [],
+  rpcClientMembers: [],
+  rpcExportProvenance: [],
   pendingNetworkCalls: [],
   storage: [],
   pendingSqliteCalls: [],

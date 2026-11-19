@@ -22,6 +22,7 @@ import {
   mergeJavaScriptStaticAnalyses,
   type JavaScriptDegradedShard,
 } from "../domain/javascript/javascriptStaticAnalysisMerge.js";
+import { resolveCrossShardRpcEndpoints } from "../domain/javascript/javascriptCrossShardRpcResolution.js";
 import {
   mergeJavaScriptSemanticFileProjections,
   type JavaScriptSemanticFileProjection,
@@ -177,7 +178,17 @@ const analyzeSharded = async (
       `Every module shard of ${filePath} exceeded its per-module time budget; no static facts could be retained`,
       { shard_count: partition.shards.length },
     );
-  const facts = mergeJavaScriptStaticAnalyses(analyses, degraded);
+  const mergedFacts = mergeJavaScriptStaticAnalyses(analyses, degraded);
+  // Cross-shard RPC resolution runs on the merged facts only, in the
+  // sharded path only; whole-file analysis output is untouched.
+  const resolvedEndpoints = resolveCrossShardRpcEndpoints(mergedFacts);
+  const facts =
+    resolvedEndpoints.length > 0
+      ? {
+          ...mergedFacts,
+          endpoints: [...mergedFacts.endpoints, ...resolvedEndpoints],
+        }
+      : mergedFacts;
   const resultBudgetBytes = await callbacks.checkpoint(facts);
   if (facts.parse_status === "failed") return null;
   if (resultBudgetBytes === 0)

@@ -102,7 +102,16 @@ import {
   electronMemberPath,
   ELECTRON_MODULE,
 } from "./javascriptElectronMemberWrites.js";
-import { range } from "./javascriptStaticAnalysisHelpers.js";
+import {
+  argumentValue,
+  range,
+} from "./javascriptStaticAnalysisHelpers.js";
+import type {
+  JavaScriptRpcClientMemberFact,
+  JavaScriptRpcExportProvenanceFact,
+  JavaScriptRpcUnresolvedDestructuredRead,
+  JavaScriptRpcUnresolvedNamespaceRead,
+} from "./javascriptRpcEndpoint.js";
 import {
   semanticCoverage,
   RETURNED_REFERENCE_WIDENING_LIMITATION,
@@ -531,6 +540,23 @@ export interface JavaScriptReceiverFacts {
    * assigned a client). Endpoints through these roots are candidates.
    */
   readonly genericRpcClientRoots: ReadonlySet<t.Node>;
+  /**
+   * Member names proven in this unit to hold an RPC client factory result,
+   * with the assignment or property node that proves each one. A cross-unit
+   * join attributes them to modules by source location.
+   */
+  readonly rpcClientMembers: readonly JavaScriptRpcClientMemberFact[];
+  /** Member exports whose value is read from another module's namespace. */
+  readonly rpcExportProvenance: readonly JavaScriptRpcExportProvenanceFact[];
+  /**
+   * Namespace member reads whose root loads a module but whose member was
+   * not proven in this unit to hold a client. Another unit's facts may
+   * still prove the member, so `.rpc()` calls on these roots are recorded
+   * as candidates rather than dropped.
+   */
+  readonly unresolvedRpcNamespaceReads: readonly JavaScriptRpcUnresolvedNamespaceRead[];
+  /** Destructured client reads not proven in this unit; same treatment. */
+  readonly unresolvedRpcDestructuredReads: readonly JavaScriptRpcUnresolvedDestructuredRead[];
 }
 
 export interface JavaScriptReceiverIndex extends JavaScriptBindingIndex {
@@ -630,7 +656,12 @@ function* classifyDefinitionReceiversSteps(
     readonly member: string;
     readonly binding: JavaScriptSemanticBindingState;
   }[] = [];
-  const collectClientMember = (node: t.Node): void => {
+  const clientMemberFacts: JavaScriptRpcClientMemberFact[] = [];
+  // One fused per-node collector for member facts: the property key of an
+  // assignment target or object property is computed once and shared by the
+  // client-member check and the export-provenance check (key reads on AST
+  // nodes are observable and bounded by resource tests).
+  const collectMemberFacts = (node: t.Node): void => {
     if (t.isAssignmentExpression(node) && node.operator === "=") {
       const left = unwrapJavaScriptExpression(node.left).node;
       if (!t.isMemberExpression(left) && !t.isOptionalMemberExpression(left))
@@ -640,8 +671,11 @@ function* classifyDefinitionReceiversSteps(
         key !== null &&
         (isJavaScriptRpcClientFactory(node.right) ||
           isGenericRpcClientFactory(node.right))
-      )
+      ) {
         clientMembers.add(key);
+        clientMemberFacts.push({ member: key, node });
+      }
+      collectExportProvenance(node, key, node.right);
       return;
     }
     if (t.isObjectProperty(node)) {
@@ -650,8 +684,11 @@ function* classifyDefinitionReceiversSteps(
         key !== null &&
         (isJavaScriptRpcClientFactory(node.value) ||
           isGenericRpcClientFactory(node.value))
-      )
+      ) {
         clientMembers.add(key);
+        clientMemberFacts.push({ member: key, node });
+      }
+      collectExportProvenance(node, key, node.value);
     }
   };
   // Whether a binding's stable initializer loads a module: an import binding,
@@ -681,6 +718,165 @@ function* classifyDefinitionReceiversSteps(
       calleeBinding !== undefined &&
       calleeBinding.definitions.some(({ kind }) => kind === "parameter")
     );
+  };
+  // The dependency index a Metro dependency-array read names: a numeric
+  // literal, or a string literal holding only digits.
+  const metroDependencyIndex = (
+    member: t.MemberExpression | t.OptionalMemberExpression,
+  ): number | null =>
+    t.isNumericLiteral(member.property)
+      ? member.property.value
+      : t.isStringLiteral(member.property) &&
+          /^\d+$/u.test(member.property.value)
+        ? Number.parseInt(member.property.value, 10)
+        : null;
+  // The `__d(factory, id, deps)` call enclosing a node, when the nearest
+  // enclosing function is the factory argument of a Metro `__d` call.
+  const metroDefineCallFor = (
+    node: t.Node,
+  ):
+    | {
+        readonly factory: t.FunctionExpression | t.ArrowFunctionExpression;
+        readonly define: t.CallExpression;
+      }
+    | undefined => {
+    let factory: t.FunctionExpression | t.ArrowFunctionExpression | undefined;
+    for (
+      let ancestor = state.parentsByNode.get(node);
+      ancestor !== undefined;
+      ancestor = state.parentsByNode.get(ancestor)
+    ) {
+      if (
+        t.isFunctionExpression(ancestor) ||
+        t.isArrowFunctionExpression(ancestor)
+      ) {
+        factory = ancestor;
+        break;
+      }
+      if (t.isProgram(ancestor)) break;
+    }
+    if (factory === undefined) return undefined;
+    const define = state.parentsByNode.get(factory);
+    if (
+      !t.isCallExpression(define) ||
+      !t.isIdentifier(define.callee, { name: "__d" }) ||
+      define.arguments[0] !== factory
+    )
+      return undefined;
+    return { factory, define };
+  };
+  const parameterBindingId = (parameter: t.Node | undefined) =>
+    parameter === undefined
+      ? undefined
+      : (() => {
+          const identifier = t.isAssignmentPattern(parameter)
+            ? parameter.left
+            : parameter;
+          return t.isIdentifier(identifier)
+            ? resolveSemanticBindingState(state, identifier, identifier.name)
+                ?.bindingId
+            : undefined;
+        })();
+  // Resolve the module a binding's loader-call initializer requests. A
+  // direct literal argument is the key itself; the Metro shape `_r(d[N])`
+  // indexes the enclosing `__d` factory's literal dependency array, whose
+  // loader and dependency parameters must be the very bindings the call
+  // uses (Metro positions: loader 1, dependencies 6).
+  const requestedModuleForBinding = (
+    binding: JavaScriptSemanticBindingState,
+  ): {
+    readonly requestedModuleKey: string | null;
+    readonly dependencyIndex: number | null;
+  } => {
+    const none = { requestedModuleKey: null, dependencyIndex: null };
+    const initializer = semanticStableInitializer(binding, state);
+    if (initializer === undefined) return none;
+    const call = unwrapJavaScriptExpression(initializer.node).node;
+    if (!t.isCallExpression(call) && !t.isOptionalCallExpression(call))
+      return none;
+    const direct = argumentValue(call.arguments[0]);
+    if (direct !== undefined)
+      return { requestedModuleKey: direct, dependencyIndex: null };
+    const argument = call.arguments[0];
+    if (argument === undefined) return none;
+    const member = unwrapJavaScriptExpression(argument).node;
+    if (!t.isMemberExpression(member) && !t.isOptionalMemberExpression(member))
+      return none;
+    const dependencyIndex = metroDependencyIndex(member);
+    if (dependencyIndex === null) return none;
+    const depsRoot = unwrapJavaScriptExpression(member.object).node;
+    const callee = unwrapJavaScriptExpression(call.callee).node;
+    if (!t.isIdentifier(depsRoot) || !t.isIdentifier(callee))
+      return { requestedModuleKey: null, dependencyIndex };
+    const depsBinding = resolveSemanticBindingState(
+      state,
+      depsRoot,
+      depsRoot.name,
+    );
+    const loaderBinding = resolveSemanticBindingState(
+      state,
+      callee,
+      callee.name,
+    );
+    if (depsBinding === undefined || loaderBinding === undefined)
+      return { requestedModuleKey: null, dependencyIndex };
+    const metro = metroDefineCallFor(call);
+    if (metro === undefined)
+      return { requestedModuleKey: null, dependencyIndex };
+    const { factory, define } = metro;
+    if (
+      parameterBindingId(factory.params[1]) !== loaderBinding.bindingId ||
+      parameterBindingId(factory.params[6]) !== depsBinding.bindingId
+    )
+      return { requestedModuleKey: null, dependencyIndex };
+    const deps = define.arguments[2];
+    if (!t.isArrayExpression(deps))
+      return { requestedModuleKey: null, dependencyIndex };
+    const element = deps.elements[dependencyIndex];
+    return {
+      requestedModuleKey:
+        element === null || element === undefined
+          ? null
+          : (argumentValue(element) ?? null),
+      dependencyIndex,
+    };
+  };
+  // Member exports whose value is read from another module's namespace
+  // (`exports.supabase = ns.supabase`): the re-export provenance a cross-unit
+  // join needs to follow one hop. Called from the fused member-facts
+  // collector with the node's already-computed property key and raw value,
+  // so no AST key is read twice.
+  const exportProvenance: JavaScriptRpcExportProvenanceFact[] = [];
+  const collectExportProvenance = (
+    node: t.Node,
+    member: string | null,
+    rawValue: t.Node,
+  ): void => {
+    if (member === null) return;
+    const value = unwrapJavaScriptExpression(rawValue).node;
+    let root: t.Node | undefined;
+    let sourceMember: string | undefined;
+    if (t.isMemberExpression(value) || t.isOptionalMemberExpression(value)) {
+      const key = semanticStaticPropertyKey(value.property, value.computed);
+      if (key === null) return;
+      root = unwrapJavaScriptExpression(value.object).node;
+      sourceMember = key;
+    } else if (t.isIdentifier(value)) {
+      root = value;
+      sourceMember = member;
+    } else return;
+    if (root === undefined || !t.isIdentifier(root) || sourceMember === undefined)
+      return;
+    const binding = resolveSemanticBindingState(state, root, root.name);
+    if (binding === undefined || !moduleLinkedInitializer(binding)) return;
+    const { requestedModuleKey } = requestedModuleForBinding(binding);
+    if (requestedModuleKey === null) return;
+    exportProvenance.push({
+      member,
+      sourceMember,
+      sourceModuleKey: requestedModuleKey,
+      node,
+    });
   };
   const classifyRpcRoot = (node: t.Node): void => {
     if (!t.isMemberExpression(node) && !t.isOptionalMemberExpression(node))
@@ -817,7 +1013,7 @@ function* classifyDefinitionReceiversSteps(
   };
   yield* traverseJavaScriptValueAstSteps(program, state.erasedSyntaxNodes, {
     enter: (node) => {
-      collectClientMember(node);
+      collectMemberFacts(node);
       classifyRpcRoot(node);
       classifyOpenReceiver(node);
     },
@@ -836,6 +1032,42 @@ function* classifyDefinitionReceiversSteps(
     }
     if (linked) genericRoots.add(root);
   }
+  // Reads that stayed unresolved only because this unit never proved the
+  // member holds a client: another unit's facts may prove it, so they are
+  // retained for the cross-unit join instead of being dropped.
+  const unresolvedNamespaceReads: JavaScriptRpcUnresolvedNamespaceRead[] = [];
+  const seenNamespaceReads = new Map<t.Node, Set<string>>();
+  for (const { root, member, binding } of namespaceReads) {
+    if (clientMembers.has(member)) continue;
+    let members = seenNamespaceReads.get(root);
+    if (members === undefined) {
+      members = new Set();
+      seenNamespaceReads.set(root, members);
+    }
+    if (members.has(member)) continue;
+    members.add(member);
+    if (!moduleLinkedInitializer(binding)) continue;
+    unresolvedNamespaceReads.push({
+      root,
+      member,
+      ...requestedModuleForBinding(binding),
+    });
+  }
+  const unresolvedDestructuredReads: JavaScriptRpcUnresolvedDestructuredRead[] =
+    [];
+  for (const binding of state.bindingsById.values()) {
+    const initializer = semanticStableInitializer(binding, state);
+    if (initializer === undefined || initializer.projection.length !== 1)
+      continue;
+    const member = initializer.projection[0];
+    if (typeof member !== "string" || clientMembers.has(member)) continue;
+    if (!moduleLinkedInitializer(binding)) continue;
+    unresolvedDestructuredReads.push({
+      bindingId: binding.bindingId,
+      member,
+      ...requestedModuleForBinding(binding),
+    });
+  }
   if (extensionStateReads.length > 0 && importsVsCodeModule(state))
     for (const start of extensionStateReads)
       facts.set(start, "extension-state");
@@ -843,6 +1075,10 @@ function* classifyDefinitionReceiversSteps(
     openReceivers: facts,
     rpcClientRoots: roots,
     genericRpcClientRoots: genericRoots,
+    rpcClientMembers: clientMemberFacts,
+    rpcExportProvenance: exportProvenance,
+    unresolvedRpcNamespaceReads: unresolvedNamespaceReads,
+    unresolvedRpcDestructuredReads: unresolvedDestructuredReads,
   };
 }
 

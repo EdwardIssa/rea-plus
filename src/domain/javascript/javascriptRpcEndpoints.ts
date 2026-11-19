@@ -10,8 +10,11 @@ import type { JavaScriptBindingIndex } from "./javascriptSemanticState.js";
 import { createJavaScriptGraphqlScan } from "./javascriptGraphqlOperations.js";
 
 import type {
+  JavaScriptRpcCandidate,
   JavaScriptRpcEndpoint,
   JavaScriptRpcScan,
+  JavaScriptRpcUnresolvedDestructuredRead,
+  JavaScriptRpcUnresolvedNamespaceRead,
 } from "./javascriptRpcEndpoint.js";
 
 export type { JavaScriptRpcScan } from "./javascriptRpcEndpoint.js";
@@ -196,11 +199,77 @@ export const createJavaScriptRpcScan = (
   clientRoots: ReadonlySet<t.Node>,
   index: JavaScriptBindingIndex,
   genericRpcClientRoots: ReadonlySet<t.Node> = new Set(),
-): JavaScriptRpcScan => {
+  unresolvedReads: {
+    readonly namespaceReads?: readonly JavaScriptRpcUnresolvedNamespaceRead[];
+    readonly destructuredReads?: readonly JavaScriptRpcUnresolvedDestructuredRead[];
+  } = {},
+): JavaScriptRpcScan & {
+  candidates(): readonly JavaScriptRpcCandidate[];
+} => {
   let marker: boolean | undefined;
   const hasMarker = (): boolean =>
     (marker ??= TRPC_SOURCE_MARKERS.some((value) => source.includes(value)));
   const graphql = createJavaScriptGraphqlScan(index);
+  const candidates: JavaScriptRpcCandidate[] = [];
+  const namespaceByRoot = new Map<
+    t.Node,
+    JavaScriptRpcUnresolvedNamespaceRead[]
+  >();
+  for (const read of unresolvedReads.namespaceReads ?? []) {
+    const reads = namespaceByRoot.get(read.root);
+    if (reads === undefined) namespaceByRoot.set(read.root, [read]);
+    else reads.push(read);
+  }
+  const destructuredByBinding = new Map(
+    (unresolvedReads.destructuredReads ?? []).map((read) => [
+      read.bindingId,
+      read,
+    ]),
+  );
+
+  // A `.rpc(name)` call whose receiver chain stayed unresolved in this unit
+  // is recorded as a candidate when its root matches an unresolved namespace
+  // or destructured client read, so a cross-unit join can still resolve it.
+  // Non-literal procedure names are never recorded.
+  const recordCandidate = (
+    node: t.CallExpression | t.OptionalCallExpression,
+    path: MemberPath,
+  ): void => {
+    const name = stringValue(node.arguments[0]);
+    if (name === undefined || name === "") return;
+    const chain = path.properties.slice(0, -1);
+    const first = chain[0];
+    if (first !== undefined) {
+      const read = (namespaceByRoot.get(path.root) ?? []).find(
+        (candidate) => candidate.member === first,
+      );
+      if (read !== undefined) {
+        candidates.push({
+          node,
+          value: name,
+          memberChain: chain,
+          requestedModuleKey: read.requestedModuleKey,
+          dependencyIndex: read.dependencyIndex,
+        });
+        return;
+      }
+    }
+    if (chain.length === 0 && t.isIdentifier(path.root)) {
+      const binding = index.bindingForReferenceAt(path.root);
+      const read =
+        binding === undefined
+          ? undefined
+          : destructuredByBinding.get(binding.bindingId);
+      if (read !== undefined)
+        candidates.push({
+          node,
+          value: name,
+          memberChain: [read.member],
+          requestedModuleKey: read.requestedModuleKey,
+          dependencyIndex: read.dependencyIndex,
+        });
+    }
+  };
 
   const procedure = (
     node: t.CallExpression | t.OptionalCallExpression,
@@ -212,17 +281,18 @@ export const createJavaScriptRpcScan = (
     // or a module-namespace member assigned a client) names its procedure in
     // the first argument. The receiver identity is inferred, so the endpoint
     // is always a candidate.
-    if (
-      path.properties[path.properties.length - 1] === "rpc" &&
-      genericRpcClientRoots.has(path.root)
-    ) {
-      const name = stringValue(node.arguments[0]);
-      if (name !== undefined && name !== "")
-        return {
-          value: name,
-          mechanism: "rpc:call",
-          interpretation: "candidate",
-        };
+    if (path.properties[path.properties.length - 1] === "rpc") {
+      if (genericRpcClientRoots.has(path.root)) {
+        const name = stringValue(node.arguments[0]);
+        if (name !== undefined && name !== "")
+          return {
+            value: name,
+            mechanism: "rpc:call",
+            interpretation: "candidate",
+          };
+        return undefined;
+      }
+      recordCandidate(node, path);
       return undefined;
     }
     const bound = clientRoots.has(path.root);
@@ -258,5 +328,6 @@ export const createJavaScriptRpcScan = (
       return graphql.inspect(node);
     },
     finish: graphql.finish,
+    candidates: () => candidates,
   };
 };

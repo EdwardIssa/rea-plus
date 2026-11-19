@@ -372,6 +372,41 @@ export const javaScriptWorkerStaticAnalysisSchema = z
         resolution: z.literal("partial").exactOptional(),
       }),
     ),
+    rpc_candidates: z
+      .array(
+        z
+          .strictObject({
+            ...findingContext,
+            value: z.string(),
+            member_chain: strings,
+            requested_module_key: z.string().nullable(),
+            dependency_index: count.nullable(),
+          })
+          .transform(withRuntime),
+      )
+      .exactOptional(),
+    rpc_client_members: z
+      .array(
+        z
+          .strictObject({
+            ...findingContext,
+            member: z.string(),
+          })
+          .transform(withRuntime),
+      )
+      .exactOptional(),
+    rpc_export_provenance: z
+      .array(
+        z
+          .strictObject({
+            ...findingContext,
+            member: z.string(),
+            source_member: z.string(),
+            source_module_key: z.string(),
+          })
+          .transform(withRuntime),
+      )
+      .exactOptional(),
     storage: z.array(
       z.strictObject({
         ...findingContext,

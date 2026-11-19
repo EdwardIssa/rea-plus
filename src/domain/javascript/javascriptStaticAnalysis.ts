@@ -33,6 +33,7 @@ import { finishElectronBrowserWindowsSteps } from "./electronStaticAnalysisBrows
 import {
   detectVendors,
   failedJavaScriptStaticAnalysis,
+  range,
   registrationKey,
   stringValue,
 } from "./javascriptStaticAnalysisHelpers.js";
@@ -56,7 +57,10 @@ import {
   inspectMetroModuleDefinition,
   inspectMetroEntryCall,
 } from "./javascriptStaticAnalysisBundler.js";
-import { finalizeLocatedFindings } from "./javascriptStaticAnalysisFindings.js";
+import {
+  addLocatedFinding,
+  finalizeLocatedFindings,
+} from "./javascriptStaticAnalysisFindings.js";
 import {
   createJavaScriptAnalysisAccumulator,
   type JavaScriptAnalysisAccumulator as AnalysisAccumulator,
@@ -117,6 +121,16 @@ export function* analyzeParsedJavaScriptStaticSourceSteps(
     file.program,
     bindings,
   );
+  const rpcScan = createJavaScriptRpcScan(
+    source,
+    receivers.rpcClientRoots,
+    index,
+    receivers.genericRpcClientRoots,
+    {
+      namespaceReads: receivers.unresolvedRpcNamespaceReads,
+      destructuredReads: receivers.unresolvedRpcDestructuredReads,
+    },
+  );
   const findings: JavaScriptFindingContext = {
     xhrOpenRequest: createXhrOpenRequestQuery(index),
     pathIntrinsics: createStaticPathIntrinsicQuery(index),
@@ -135,20 +149,56 @@ export function* analyzeParsedJavaScriptStaticSourceSteps(
     electronExportIntact: electronIdentity.intactExport,
     electronInvocationPath: electronIdentity.invocationPath,
     electronAppPathChangePossible: electronIdentity.mayChangeAppPath,
-    rpcScan: createJavaScriptRpcScan(
-      source,
-      receivers.rpcClientRoots,
-      index,
-      receivers.genericRpcClientRoots,
-    ),
+    rpcScan,
     expressionShapes: createSemanticExpressionShapeResolver(bindings),
   };
+  // Retain the receiver classification's cross-unit working facts with the
+  // same module attribution endpoints receive, so a sharded run can join
+  // them after the per-shard merge.
+  for (const fact of receivers.rpcClientMembers)
+    addLocatedFinding(findings, {
+      collection: accumulator.rpcClientMembers,
+      key: `rpc-client-member\0${fact.member}`,
+      node: fact.node,
+      value: {
+        member: fact.member,
+        module_key: null,
+        location: range(fact.node),
+      },
+    });
+  for (const fact of receivers.rpcExportProvenance)
+    addLocatedFinding(findings, {
+      collection: accumulator.rpcExportProvenance,
+      key: `rpc-export-provenance\0${fact.member}\0${fact.sourceModuleKey}`,
+      node: fact.node,
+      value: {
+        member: fact.member,
+        source_member: fact.sourceMember,
+        source_module_key: fact.sourceModuleKey,
+        module_key: null,
+        location: range(fact.node),
+      },
+    });
   const routeScan = yield* JavaScriptRouteScan.createSteps(
     file,
     index,
     (fact) => addEndpoint(findings, { ...fact, kind: "route" }),
   );
   yield* traverseStaticSourceSteps(file, findings, bindings, routeScan);
+  for (const candidate of rpcScan.candidates())
+    addLocatedFinding(findings, {
+      collection: accumulator.rpcCandidates,
+      key: `rpc-candidate\0${candidate.value}`,
+      node: candidate.node,
+      value: {
+        value: candidate.value,
+        member_chain: candidate.memberChain,
+        requested_module_key: candidate.requestedModuleKey,
+        dependency_index: candidate.dependencyIndex,
+        module_key: null,
+        location: range(candidate.node),
+      },
+    });
   const routes = yield* routeScan.finishSteps();
   if (accumulator.bundlerExportHelpersObserved)
     yield* index.indexMemberMutationFactsSteps();
@@ -320,6 +370,30 @@ const finalizeStaticAnalysis = (
       accumulator.endpoints,
       accumulator.moduleRangeIndex,
     ),
+    ...(accumulator.rpcCandidates.length > 0
+      ? {
+          rpc_candidates: finalizeLocatedFindings(
+            accumulator.rpcCandidates,
+            accumulator.moduleRangeIndex,
+          ),
+        }
+      : {}),
+    ...(accumulator.rpcClientMembers.length > 0
+      ? {
+          rpc_client_members: finalizeLocatedFindings(
+            accumulator.rpcClientMembers,
+            accumulator.moduleRangeIndex,
+          ),
+        }
+      : {}),
+    ...(accumulator.rpcExportProvenance.length > 0
+      ? {
+          rpc_export_provenance: finalizeLocatedFindings(
+            accumulator.rpcExportProvenance,
+            accumulator.moduleRangeIndex,
+          ),
+        }
+      : {}),
     routes,
     storage: finalizeLocatedFindings(
       accumulator.storage,

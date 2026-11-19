@@ -72,6 +72,45 @@ export interface JavaScriptStaticEndpoint {
   readonly location: JavaScriptSourceRange;
 }
 
+/**
+ * A `.rpc(name)` call site whose receiver chain did not resolve within the
+ * analyzed unit. Recorded so a cross-shard join can resolve it against other
+ * modules' facts; carries no endpoint claim by itself.
+ */
+export interface JavaScriptStaticRpcCandidate {
+  readonly value: string;
+  /** Member names between the receiver root and the trailing `rpc`. */
+  readonly member_chain: readonly string[];
+  /** Metro module key the receiver root's loader call requests. */
+  readonly requested_module_key: string | null;
+  /** Dependency-array index of the request; null for a direct literal key. */
+  readonly dependency_index: number | null;
+  readonly module_key: string | null;
+  /** Recovered factory runtime; absent in older or unbundled findings. */
+  readonly module_runtime?: string;
+  readonly location: JavaScriptSourceRange;
+}
+
+/** A member name proven in the analyzed unit to hold an RPC client factory result. */
+export interface JavaScriptStaticRpcClientMember {
+  readonly member: string;
+  readonly module_key: string | null;
+  /** Recovered factory runtime; absent in older or unbundled findings. */
+  readonly module_runtime?: string;
+  readonly location: JavaScriptSourceRange;
+}
+
+/** A member export whose value is read from another module's namespace. */
+export interface JavaScriptStaticRpcExportProvenance {
+  readonly member: string;
+  readonly source_member: string;
+  readonly source_module_key: string;
+  readonly module_key: string | null;
+  /** Recovered factory runtime; absent in older or unbundled findings. */
+  readonly module_runtime?: string;
+  readonly location: JavaScriptSourceRange;
+}
+
 /** A storage API or explicitly uncertain candidate, without executing source. */
 export interface JavaScriptStaticStorage {
   readonly kind:
@@ -143,6 +182,10 @@ export interface JavaScriptStaticAnalysis {
   readonly visited_ast_nodes: number;
   readonly references: readonly JavaScriptStaticReference[];
   readonly endpoints: readonly JavaScriptStaticEndpoint[];
+  /** Cross-shard RPC working facts; absent when nothing was recorded. */
+  readonly rpc_candidates?: readonly JavaScriptStaticRpcCandidate[];
+  readonly rpc_client_members?: readonly JavaScriptStaticRpcClientMember[];
+  readonly rpc_export_provenance?: readonly JavaScriptStaticRpcExportProvenance[];
   /** Missing in historical analyses; absence means unmeasured route coverage. */
   readonly routes?: JavaScriptRouteSourceFacts;
   readonly storage: readonly JavaScriptStaticStorage[];

@@ -185,6 +185,15 @@ export const mergeJavaScriptStaticAnalyses = (
     degraded,
   );
   const routes = mergeRoutes(analyses.map(({ routes }) => routes));
+  const rpcCandidates = analyses.flatMap(
+    ({ rpc_candidates }) => rpc_candidates ?? [],
+  );
+  const rpcClientMembers = analyses.flatMap(
+    ({ rpc_client_members }) => rpc_client_members ?? [],
+  );
+  const rpcExportProvenance = analyses.flatMap(
+    ({ rpc_export_provenance }) => rpc_export_provenance ?? [],
+  );
   const registrations = uniqueSortedBy(
     mergeMetroRegistrations(
       analyses.flatMap(({ bundler_registrations }) => bundler_registrations),
@@ -248,6 +257,13 @@ export const mergeJavaScriptStaticAnalyses = (
     ),
     references: analyses.flatMap(({ references }) => references),
     endpoints: analyses.flatMap(({ endpoints }) => endpoints),
+    ...(rpcCandidates.length > 0 ? { rpc_candidates: rpcCandidates } : {}),
+    ...(rpcClientMembers.length > 0
+      ? { rpc_client_members: rpcClientMembers }
+      : {}),
+    ...(rpcExportProvenance.length > 0
+      ? { rpc_export_provenance: rpcExportProvenance }
+      : {}),
     ...(routes !== undefined ? { routes } : {}),
     storage: analyses.flatMap(({ storage }) => storage),
     bundler_registrations: registrations,
