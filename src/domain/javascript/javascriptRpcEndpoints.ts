@@ -5,7 +5,7 @@ import {
   semanticStaticPropertyKey,
   semanticFinalObjectStringProperty,
 } from "./javascriptAstValues.js";
-import { calleeName } from "./javascriptStaticAnalysisHelpers.js";
+import { calleeName, stringValue } from "./javascriptStaticAnalysisHelpers.js";
 import type { JavaScriptBindingIndex } from "./javascriptSemanticState.js";
 import { createJavaScriptGraphqlScan } from "./javascriptGraphqlOperations.js";
 
@@ -53,6 +53,14 @@ const TRPC_SUBSCRIPTION_CALLBACKS: ReadonlySet<string> = new Set([
 const TRPC_CLIENT_FACTORIES: ReadonlySet<string> = new Set([
   "createTRPCClient",
   "createTRPCProxyClient",
+]);
+// Generic client factories whose result exposes a named-procedure `.rpc()`
+// method (Supabase's createClient is the canonical case). A factory name
+// alone never proves a client; it only corroborates the `.rpc()` call shape
+// when combined with a member assignment or a direct binding, and endpoints
+// recovered through it are labeled candidates.
+const GENERIC_RPC_CLIENT_FACTORIES: ReadonlySet<string> = new Set([
+  "createClient",
 ]);
 // Built-in HTTP links documented by tRPC 11.19 that carry a `url` option.
 const TRPC_URL_LINKS: ReadonlySet<string> = new Set([
@@ -143,6 +151,21 @@ export const isJavaScriptRpcClientFactory = (node: t.Node): boolean => {
   );
 };
 
+/**
+ * Whether an expression is a call to a generic `.rpc()` client factory.
+ * Weaker evidence than a documented tRPC factory: callers must combine it
+ * with a binding or member-assignment shape and label results as candidates.
+ */
+export const isGenericRpcClientFactory = (node: t.Node): boolean => {
+  const call = unwrapJavaScriptExpression(node).node;
+  return (
+    (t.isCallExpression(call) || t.isOptionalCallExpression(call)) &&
+    GENERIC_RPC_CLIENT_FACTORIES.has(
+      rpcFactoryName(call.callee).split(".").pop() ?? "",
+    )
+  );
+};
+
 /** Recover the literal `url` option passed to a documented tRPC HTTP link. */
 const trpcLinkUrl = (
   node: t.CallExpression | t.OptionalCallExpression,
@@ -165,11 +188,14 @@ const trpcLinkUrl = (
  * marker and a tRPC observer argument. Unshadowed browser globals and `this`
  * roots are excluded; RTK Query `endpoints` exclusions apply only without a
  * recognized client binding. Router segment spelling does not supply identity.
+ * A `.rpc(name)` call needs a root classified as a generic RPC client and is
+ * always reported as a candidate.
  */
 export const createJavaScriptRpcScan = (
   source: string,
   clientRoots: ReadonlySet<t.Node>,
   index: JavaScriptBindingIndex,
+  genericRpcClientRoots: ReadonlySet<t.Node> = new Set(),
 ): JavaScriptRpcScan => {
   let marker: boolean | undefined;
   const hasMarker = (): boolean =>
@@ -181,6 +207,24 @@ export const createJavaScriptRpcScan = (
   ): JavaScriptRpcEndpoint | undefined => {
     const path = memberPath(node.callee);
     if (path === undefined || t.isThisExpression(path.root)) return undefined;
+    // A named-procedure `.rpc(name, ...)` call on a receiver classified as a
+    // generic RPC client (direct createClient binding, destructured export,
+    // or a module-namespace member assigned a client) names its procedure in
+    // the first argument. The receiver identity is inferred, so the endpoint
+    // is always a candidate.
+    if (
+      path.properties[path.properties.length - 1] === "rpc" &&
+      genericRpcClientRoots.has(path.root)
+    ) {
+      const name = stringValue(node.arguments[0]);
+      if (name !== undefined && name !== "")
+        return {
+          value: name,
+          mechanism: "rpc:call",
+          interpretation: "candidate",
+        };
+      return undefined;
+    }
     const bound = clientRoots.has(path.root);
     if (
       t.isIdentifier(path.root) &&

@@ -11,6 +11,8 @@ export const SEMANTIC_EXPRESSION_DEPTH_LIMIT = 256;
 export const SEMANTIC_GETTER_EXPANSION_LIMIT = 512;
 /** Additional selector states retained by one precise alias query. */
 export const SEMANTIC_ALIAS_SELECTION_LIMIT = 512;
+/** Total expansion work units retained by one member-mutation indexing pass. */
+export const SEMANTIC_MEMBER_MUTATION_WORK_LIMIT = 8_000_000;
 /** Bound normalized strings and transient keys independently of transport limits. */
 export const SEMANTIC_PRIMITIVE_JSON_BYTES_LIMIT = 1_048_576;
 
@@ -25,6 +27,8 @@ const RESOURCE_LIMIT_REASON: Record<JavaScriptSemanticResourceLimit, string> = {
     "Getter expansion was conservatively bounded (maximum 512 scheduled states or a growing receiver cycle).",
   "alias-selections":
     "Alias selection expansion was conservatively bounded (maximum 512 additional selector states); selected paths remain unknown.",
+  "member-mutation-work":
+    "Member mutation indexing was conservatively bounded (maximum 8000000 work units); member effects beyond the bound remain unknown.",
 };
 
 /** Check UTF-16 length against worst-case JSON escaping without flattening. */

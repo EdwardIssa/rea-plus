@@ -1,5 +1,6 @@
 import { createXhrOpenRequestQuery } from "./javascriptNetworkRequests.js";
 import { uniqueSortedBy } from "../canonicalOrdering.js";
+import { compareUnicodeCodePoints } from "../unicodeCodePointOrder.js";
 import * as t from "@babel/types";
 import { JavaScriptRouteScan } from "./javascriptRouteScan.js";
 import type { JavaScriptRouteSourceFacts } from "./javascriptRouteFacts.js";
@@ -52,6 +53,8 @@ import {
   inspectBundlerRegistration,
   inspectBundlerBootstrap,
   inspectEsbuildWrapper,
+  inspectMetroModuleDefinition,
+  inspectMetroEntryCall,
 } from "./javascriptStaticAnalysisBundler.js";
 import { finalizeLocatedFindings } from "./javascriptStaticAnalysisFindings.js";
 import {
@@ -132,7 +135,12 @@ export function* analyzeParsedJavaScriptStaticSourceSteps(
     electronExportIntact: electronIdentity.intactExport,
     electronInvocationPath: electronIdentity.invocationPath,
     electronAppPathChangePossible: electronIdentity.mayChangeAppPath,
-    rpcScan: createJavaScriptRpcScan(source, receivers.rpcClientRoots, index),
+    rpcScan: createJavaScriptRpcScan(
+      source,
+      receivers.rpcClientRoots,
+      index,
+      receivers.genericRpcClientRoots,
+    ),
     expressionShapes: createSemanticExpressionShapeResolver(bindings),
   };
   const routeScan = yield* JavaScriptRouteScan.createSteps(
@@ -235,6 +243,35 @@ const finalizeStaticAnalysis = (
     },
     applicability: { electron: electronObserved ? "observed" : "unknown" },
   };
+  // A shard holding only the runtime prelude observes entry invocations but
+  // no definitions; emit its registration too so per-shard merges keep the
+  // entry keys a whole-file pass would report.
+  const metroLocation =
+    accumulator.metroRegistrationLocation ??
+    accumulator.metroFirstEntryLocation;
+  if (
+    (accumulator.metroModules.length > 0 ||
+      accumulator.metroEntryModuleKeys.length > 0) &&
+    metroLocation !== null
+  )
+    accumulator.registrations.push({
+      bundler: "metro",
+      runtime: "metro",
+      chunk_keys: [`metro@${String(accumulator.metroFirstDefineStart ?? 0)}`],
+      unknown_chunk_keys: 0,
+      // The prelude's require global; factories receive it as their second
+      // parameter under the per-module name recorded on each module.
+      runtime_require_name: "__r",
+      runtime_module_cache_status: "not-observed",
+      entry_module_keys: [...new Set(accumulator.metroEntryModuleKeys)],
+      unknown_entry_module_keys: 0,
+      async_chunk_keys: [...new Set(accumulator.metroAsyncChunkKeys)],
+      unknown_async_chunk_keys: accumulator.metroUnknownAsyncChunkKeys,
+      modules: [...accumulator.metroModules].sort((left, right) =>
+        compareUnicodeCodePoints(left.module_key, right.module_key),
+      ),
+      location: metroLocation,
+    });
   const limitations = [
     ...(bindings.valueResourceLimits.has("alias-selections")
       ? [semanticResourceLimitReason("alias-selections")]
@@ -354,6 +391,8 @@ const inspectNode = (
     inspectBundlerBootstrap(source, node, accumulator, bindings);
     inspectBundlerRegistration(source, node, accumulator, bindings);
     inspectEsbuildWrapper(source, node, accumulator, bindings);
+    inspectMetroModuleDefinition(source, node, accumulator, bindings);
+    inspectMetroEntryCall(node, accumulator, bindings);
     if (
       semanticFactoryLoaderMemberAt(
         node,

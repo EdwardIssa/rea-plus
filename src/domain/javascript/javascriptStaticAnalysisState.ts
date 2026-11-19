@@ -6,8 +6,10 @@ import type { JavaScriptStaticPathIntrinsicQuery } from "./javascriptStaticAnaly
 import type { JavaScriptExpressionShapeResolver } from "./javascriptSemanticExpressionShapes.js";
 
 import type {
+  JavaScriptBundlerModule,
   JavaScriptBundlerRegistration,
   JavaScriptRolePath,
+  JavaScriptSourceRange,
   JavaScriptStaticAnalysis,
   JavaScriptStaticEndpoint,
   JavaScriptStaticReference,
@@ -79,6 +81,15 @@ export interface JavaScriptAnalysisAccumulator {
   readonly roles: LocatedJavaScriptFinding<JavaScriptRolePath>[];
   readonly sourceMaps: JavaScriptStaticAnalysis["source_map_urls"][number][];
   readonly registrations: JavaScriptBundlerRegistration[];
+  /** Metro modules recovered one define call at a time; emitted as a single registration at finalize. */
+  readonly metroModules: JavaScriptBundlerModule[];
+  readonly metroEntryModuleKeys: string[];
+  readonly metroAsyncChunkKeys: string[];
+  metroUnknownAsyncChunkKeys: number;
+  metroFirstDefineStart: number | null;
+  metroRegistrationLocation: JavaScriptSourceRange | null;
+  /** First `__r(...)` entry call seen; anchors an entry-only registration. */
+  metroFirstEntryLocation: JavaScriptSourceRange | null;
   readonly browserWindows: LocatedJavaScriptFinding<ElectronBrowserWindowFinding>[];
   readonly pendingBrowserWindows: t.NewExpression[];
   readonly contextBridgeApis: LocatedJavaScriptFinding<ElectronContextBridgeFinding>[];
@@ -176,6 +187,13 @@ export const createJavaScriptAnalysisAccumulator = (
   roles: [],
   sourceMaps: [],
   registrations: [],
+  metroModules: [],
+  metroEntryModuleKeys: [],
+  metroAsyncChunkKeys: [],
+  metroUnknownAsyncChunkKeys: 0,
+  metroFirstDefineStart: null,
+  metroRegistrationLocation: null,
+  metroFirstEntryLocation: null,
   browserWindows: [],
   pendingBrowserWindows: [],
   contextBridgeApis: [],

@@ -105,7 +105,7 @@ export interface JavaScriptBundlerModule extends JavaScriptBundlerModuleState {
 
 /** One statically recognized bundler chunk or module registration. */
 export interface JavaScriptBundlerRegistration {
-  readonly bundler: "webpack" | "rspack" | "esbuild";
+  readonly bundler: "webpack" | "rspack" | "esbuild" | "metro";
   readonly runtime: string;
   readonly chunk_keys: readonly string[];
   readonly unknown_chunk_keys: number;
