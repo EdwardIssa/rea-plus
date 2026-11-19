@@ -3,6 +3,15 @@ import { expect, it } from "vitest";
 import type { JavaScriptArtifactFile } from "../../domain/javascript/javascriptArtifactFiles.js";
 import { analyzeJavaScriptSemantics } from "../../domain/javascript/javascriptSemanticAnalysis.js";
 import { mergeJavaScriptSemanticFileProjections } from "../../domain/javascript/javascriptSemanticFileProjection.js";
+import {
+  analyzeJavaScriptStaticSource,
+  analyzeParsedJavaScriptStaticSourceSteps,
+} from "../../domain/javascript/javascriptStaticAnalysis.js";
+import { mergeJavaScriptStaticAnalyses } from "../../domain/javascript/javascriptStaticAnalysisMerge.js";
+import { partitionMetroBundle } from "../../domain/javascript/javascriptMetroBundlePartition.js";
+import { parseJavaScriptSource } from "../../domain/javascript/javascriptSourceParser.js";
+import { resolveCrossShardRpcEndpoints } from "../../domain/javascript/javascriptCrossShardRpcResolution.js";
+import type { JavaScriptStaticEndpoint } from "../../domain/javascript/javascriptStaticAnalysisTypes.js";
 import { projectJavaScriptSemanticFileSteps } from "./JavaScriptSemanticGraphBuilder.js";
 import { completeJavaScriptAnalysisSteps } from "./JavaScriptAnalysisControl.js";
 
@@ -61,4 +70,87 @@ it("propagates node truncation from any shard", async () => {
   const truncated = { ...complete, nodesTruncated: true };
   const merged = mergeJavaScriptSemanticFileProjections([complete, truncated]);
   expect(merged.nodesTruncated).toBe(true);
+});
+
+// A Metro bundle whose generic RPC client is published by one module and
+// consumed from two others: module 100 assigns a createClient result to its
+// `supabase` export; module 101 reads it through a namespace member and
+// module 102 destructures it. Whole-file analysis surfaces both `.rpc()`
+// endpoints; per-shard analysis cannot classify either receiver locally.
+const crossModuleBundle = [
+  `__d(function (global, _r, _importDefault, _importAll, _module, _exports, _deps) {
+     _exports.supabase = createClient("https://example.supabase.co", "anon-key");
+   }, 100, []);`,
+  `__d(function (global, _r, _importDefault, _importAll, _module, _exports, _deps) {
+     var _ns = _r(_deps[0]);
+     var dynamicName = "ignored";
+     _exports.load = function () {
+       _ns.supabase.rpc(dynamicName);
+       return _ns.supabase.rpc("cast_guest_vote", { ballot: 1 });
+     };
+   }, 101, [100]);`,
+  `__d(function (global, _r, _importDefault, _importAll, _module, _exports, _deps) {
+     var { supabase } = _r(_deps[0]);
+     _exports.issue = function () {
+       return supabase.rpc("issue_guest_token", {});
+     };
+   }, 102, [100]);`,
+  ...[103, 104, 105, 106, 107].map(
+    (key) =>
+      `__d(function (global, _r, _importDefault, _importAll, _module, _exports, _deps) {
+         _exports.filler${String(key)} = ${String(key)};
+       }, ${String(key)}, []);`,
+  ),
+  `__r(101);`,
+].join("\n");
+
+const rpcEndpoints = (
+  endpoints: readonly JavaScriptStaticEndpoint[],
+): string[] =>
+  endpoints
+    .filter(({ mechanism }) => mechanism === "rpc:call")
+    .map(
+      ({ value, interpretation, module_key }) =>
+        `${value}|${interpretation ?? ""}|${module_key ?? ""}`,
+    )
+    .sort();
+
+const shardedStaticFacts = async (value: string) => {
+  const parsed = parseJavaScriptSource(value, "app.js");
+  if (parsed === null) throw new Error("Expected the fixture to parse");
+  const partition = partitionMetroBundle(parsed.program);
+  if (partition === null) throw new Error("Expected a Metro partition");
+  const original = parsed.program.body;
+  try {
+    const analyses = [];
+    for (const shard of partition.shards) {
+      parsed.program.body = [...shard.statements];
+      analyses.push(
+        await completeJavaScriptAnalysisSteps(
+          analyzeParsedJavaScriptStaticSourceSteps(value, parsed),
+        ),
+      );
+    }
+    return mergeJavaScriptStaticAnalyses(analyses);
+  } finally {
+    parsed.program.body = original;
+  }
+};
+
+it("resolves cross-shard RPC endpoints to whole-file parity", async () => {
+  const whole = analyzeJavaScriptStaticSource(crossModuleBundle);
+  const expected = rpcEndpoints(whole.endpoints);
+  expect(expected).toEqual([
+    "cast_guest_vote|candidate|101",
+    "issue_guest_token|candidate|102",
+  ]);
+  const merged = await shardedStaticFacts(crossModuleBundle);
+  // The gap the join closes: neither receiver classifies inside its shard,
+  // and the non-literal call in module 101 is never recorded.
+  expect(rpcEndpoints(merged.endpoints)).toEqual([]);
+  expect(
+    (merged.rpc_candidates ?? []).map(({ value }) => value).sort(),
+  ).toEqual(["cast_guest_vote", "issue_guest_token"]);
+  const resolved = resolveCrossShardRpcEndpoints(merged);
+  expect(rpcEndpoints([...merged.endpoints, ...resolved])).toEqual(expected);
 });
