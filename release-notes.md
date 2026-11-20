@@ -1178,6 +1178,7 @@
 * strengthen and prune audited test coverage ([#8573](https://github.com/EdwardIssa/rea-plus/issues/8573)) ([7bcefea](https://github.com/EdwardIssa/rea-plus/commit/7bcefead69bf97b45225f8cfc1ce57ce9e6903ec))
 * strengthen integration oracles and verification ([#8295](https://github.com/EdwardIssa/rea-plus/issues/8295)) ([6014928](https://github.com/EdwardIssa/rea-plus/commit/60149282fcfc05ac32fbc94434c107710120da6f))
 * strengthen regression oracles and cleanup ownership ([#8152](https://github.com/EdwardIssa/rea-plus/issues/8152)) ([675d407](https://github.com/EdwardIssa/rea-plus/commit/675d4076de1af5052f01709a9cf4cdf0cc3e2c67))
+* **web:** split oversized source-location CLI parity test under the lint limit ([3225017](https://github.com/EdwardIssa/rea-plus/commit/3225017d36ff4ffa04f601e4ca974a625484183c))
 
 
 ### Continuous Integration
