@@ -12,33 +12,208 @@ import { mkdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { webSourceLocationFixture } from "../fixtures/webSourceLocation.js";
 import { createTestTempDirectory } from "../fixtures/temporaryDirectory.js";
-import { cliTest } from "../support/cli/cliFixture.js";
+import {
+  cliTest,
+  type CliResult,
+  type TestCli,
+} from "../support/cli/cliFixture.js";
+
+interface SourceLocationParity {
+  readonly root: string;
+  readonly fixture: ReturnType<typeof webSourceLocationFixture>;
+  readonly manifest: string;
+  readonly map: string;
+}
+
+const writeParityFixture = async (
+  root: string,
+): Promise<Omit<SourceLocationParity, "root">> => {
+  const fixture = webSourceLocationFixture(
+    JSON.stringify({
+      version: 3,
+      sources: ["dir/original.ts", "dir//original.ts"],
+      sourcesContent: ["original", "second"],
+      names: [],
+      mappings: "AAAA,ACAA",
+    }),
+  );
+  await mkdir(join(root, "files", "modules"), { recursive: true });
+  await writeFile(join(root, "files", "modules", "main.js"), fixture.source);
+  let manifest = join(root, "manifest.json").replaceAll("\\", "/");
+  const map = join(root, "app.js.map");
+  await writeFile(manifest, JSON.stringify(fixture.manifest));
+  if (process.platform !== "win32") {
+    await mkdir(join(root, "lexical"));
+    await mkdir(join(root, "nested"));
+    await symlink(join(root, "nested"), join(root, "lexical", "link"));
+    manifest = `${root}/lexical/link/../manifest.json`;
+  }
+  await writeFile(map, fixture.sourceMap.text);
+  return { fixture, manifest, map };
+};
+
+const expectCliParityResult = (
+  response: CliResult,
+  { root, manifest, fixture }: SourceLocationParity,
+): void => {
+  expect(response.exitCode, response.stdout + response.stderr).toBe(0);
+  expect(response.json).toMatchObject({
+    normalized_result: {
+      manifest: {
+        path: manifest,
+        reported_output_directory: fixture.manifest.output_directory,
+      },
+      source: {
+        script_index: 0,
+        path: join(root, "files", "modules", "main.js"),
+      },
+      source_map: { association: "caller-selected" },
+      generated_offset: 0,
+      execution: "unknown",
+      matches: [
+        {
+          source_index: 0,
+          resolved_url: "https://app.test/dir/original.ts",
+          content: { text: "original" },
+        },
+        {
+          source_index: 1,
+          resolved_url: "https://app.test/dir//original.ts",
+          content: { text: "second" },
+        },
+      ],
+      runtime: {
+        id: process.versions.bun === undefined ? "node-v8" : "bun",
+      },
+    },
+  });
+  const limitation =
+    "Source names and sourceRoot are reported declarations. REA derives resolved URLs using WHATWG URL resolution; the pinned upstream codec decodes mappings. No original source is fetched or executed.";
+  expect(response.json).toMatchObject({
+    limitations: expect.arrayContaining([limitation]),
+    normalized_result: { limitations: expect.arrayContaining([limitation]) },
+  });
+};
+
+const connectSourceLocationClient = async (map: string): Promise<Client> => {
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: [
+      fileURLToPath(new URL("../../scripts/rea.mjs", import.meta.url)),
+      "mcp",
+    ],
+    env: {
+      ...getDefaultEnvironment(),
+      REA_LOG_LEVEL: "silent",
+      CLANG_MODULE_CACHE_PATH: map,
+    },
+    stderr: "pipe",
+  });
+  const client = new Client({
+    name: "source-location-cli-parity",
+    version: "1",
+  });
+  onTestFinished(async () => {
+    try {
+      await client.close();
+    } finally {
+      await transport.close();
+    }
+  });
+  await client.connect(transport);
+  return client;
+};
+
+const expectMcpParity = async (
+  client: Client,
+  responseJson: unknown,
+  { manifest, map, fixture }: SourceLocationParity,
+): Promise<void> => {
+  const mcpResponse = await client.callTool({
+    name: "trace_web_source_location",
+    arguments: {
+      manifest_path: manifest,
+      script_index: 0,
+      source_map: { path: map, url: fixture.sourceMap.url },
+      generated_position: { line: 1, column: 0 },
+    },
+  });
+  expect(mcpResponse.isError, JSON.stringify(mcpResponse)).not.toBe(true);
+  expect(mcpResponse.structuredContent).toEqual(responseJson);
+  const pastColumn = await client.callTool({
+    name: "trace_web_source_location",
+    arguments: {
+      manifest_path: manifest,
+      script_index: 0,
+      source_map: { path: map, url: fixture.sourceMap.url },
+      generated_position: { line: 1, column: 10 },
+    },
+  });
+  expect(parseMcpToolError(pastColumn).error).toMatchObject({
+    code: "invalid_request",
+    details: {
+      issues: [
+        {
+          path: ["generated_position", "column"],
+          reason: "out_of_range",
+          maximum: fixture.source.length,
+        },
+      ],
+    },
+  });
+};
+
+const expectOutOfRangeLine = async (
+  cli: TestCli,
+  { root, manifest, map, fixture }: SourceLocationParity,
+): Promise<void> => {
+  const invalid = await cli.run({
+    arguments: [
+      "trace-web-source-location",
+      manifest,
+      "0",
+      map,
+      fixture.sourceMap.url,
+      "2",
+      "0",
+      "--json",
+    ],
+    environment: { REA_LOG_LEVEL: "silent" },
+    timeoutMs: 45000,
+  });
+  expect(invalid.exitCode).toBe(1);
+  expect(invalid.json).toMatchObject({
+    code: "invalid_request",
+    details: {
+      issues: [
+        {
+          path: ["generated_position", "line"],
+          reason: "out_of_range",
+          maximum: 1,
+        },
+      ],
+      partial_observation: {
+        kind: "web-trace-observation",
+        analysis: "incomplete",
+        manifest: { path: manifest },
+        source: { path: join(root, "files", "modules", "main.js") },
+        source_map: {
+          path: map,
+          sha256: createHash("sha256")
+            .update(fixture.sourceMap.text)
+            .digest("hex"),
+        },
+      },
+    },
+  });
+};
 
 cliTest(
   "accepts numeric UTF-16 coordinates and runs the actual owned source-map codec without a browser",
   async ({ cli }) => {
     const root = await createTestTempDirectory("rea-source-map-cli-");
-    const fixture = webSourceLocationFixture(
-      JSON.stringify({
-        version: 3,
-        sources: ["dir/original.ts", "dir//original.ts"],
-        sourcesContent: ["original", "second"],
-        names: [],
-        mappings: "AAAA,ACAA",
-      }),
-    );
-    await mkdir(join(root, "files", "modules"), { recursive: true });
-    await writeFile(join(root, "files", "modules", "main.js"), fixture.source);
-    let manifest = join(root, "manifest.json").replaceAll("\\", "/");
-    const map = join(root, "app.js.map");
-    await writeFile(manifest, JSON.stringify(fixture.manifest));
-    if (process.platform !== "win32") {
-      await mkdir(join(root, "lexical"));
-      await mkdir(join(root, "nested"));
-      await symlink(join(root, "nested"), join(root, "lexical", "link"));
-      manifest = `${root}/lexical/link/../manifest.json`;
-    }
-    await writeFile(map, fixture.sourceMap.text);
+    const { fixture, manifest, map } = await writeParityFixture(root);
+    const parity: SourceLocationParity = { root, fixture, manifest, map };
     const response = await cli.run({
       arguments: [
         "trace-web-source-location",
@@ -57,139 +232,10 @@ cliTest(
       },
       timeoutMs: 45000,
     });
-    expect(response.exitCode, response.stdout + response.stderr).toBe(0);
-    expect(response.json).toMatchObject({
-      normalized_result: {
-        manifest: {
-          path: manifest,
-          reported_output_directory: fixture.manifest.output_directory,
-        },
-        source: {
-          script_index: 0,
-          path: join(root, "files", "modules", "main.js"),
-        },
-        source_map: { association: "caller-selected" },
-        generated_offset: 0,
-        execution: "unknown",
-        matches: [
-          {
-            source_index: 0,
-            resolved_url: "https://app.test/dir/original.ts",
-            content: { text: "original" },
-          },
-          {
-            source_index: 1,
-            resolved_url: "https://app.test/dir//original.ts",
-            content: { text: "second" },
-          },
-        ],
-        runtime: {
-          id: process.versions.bun === undefined ? "node-v8" : "bun",
-        },
-      },
-    });
-    const limitation =
-      "Source names and sourceRoot are reported declarations. REA derives resolved URLs using WHATWG URL resolution; the pinned upstream codec decodes mappings. No original source is fetched or executed.";
-    expect(response.json).toMatchObject({
-      limitations: expect.arrayContaining([limitation]),
-      normalized_result: { limitations: expect.arrayContaining([limitation]) },
-    });
-    const transport = new StdioClientTransport({
-      command: process.execPath,
-      args: [
-        fileURLToPath(new URL("../../scripts/rea.mjs", import.meta.url)),
-        "mcp",
-      ],
-      env: {
-        ...getDefaultEnvironment(),
-        REA_LOG_LEVEL: "silent",
-        CLANG_MODULE_CACHE_PATH: map,
-      },
-      stderr: "pipe",
-    });
-    const client = new Client({
-      name: "source-location-cli-parity",
-      version: "1",
-    });
-    onTestFinished(async () => {
-      try {
-        await client.close();
-      } finally {
-        await transport.close();
-      }
-    });
-    await client.connect(transport);
-    const mcpResponse = await client.callTool({
-      name: "trace_web_source_location",
-      arguments: {
-        manifest_path: manifest,
-        script_index: 0,
-        source_map: { path: map, url: fixture.sourceMap.url },
-        generated_position: { line: 1, column: 0 },
-      },
-    });
-    expect(mcpResponse.isError, JSON.stringify(mcpResponse)).not.toBe(true);
-    expect(mcpResponse.structuredContent).toEqual(response.json);
-    const pastColumn = await client.callTool({
-      name: "trace_web_source_location",
-      arguments: {
-        manifest_path: manifest,
-        script_index: 0,
-        source_map: { path: map, url: fixture.sourceMap.url },
-        generated_position: { line: 1, column: 10 },
-      },
-    });
-    expect(parseMcpToolError(pastColumn).error).toMatchObject({
-      code: "invalid_request",
-      details: {
-        issues: [
-          {
-            path: ["generated_position", "column"],
-            reason: "out_of_range",
-            maximum: fixture.source.length,
-          },
-        ],
-      },
-    });
-    const invalid = await cli.run({
-      arguments: [
-        "trace-web-source-location",
-        manifest,
-        "0",
-        map,
-        fixture.sourceMap.url,
-        "2",
-        "0",
-        "--json",
-      ],
-      environment: { REA_LOG_LEVEL: "silent" },
-      timeoutMs: 45000,
-    });
-    expect(invalid.exitCode).toBe(1);
-    expect(invalid.json).toMatchObject({
-      code: "invalid_request",
-      details: {
-        issues: [
-          {
-            path: ["generated_position", "line"],
-            reason: "out_of_range",
-            maximum: 1,
-          },
-        ],
-        partial_observation: {
-          kind: "web-trace-observation",
-          analysis: "incomplete",
-          manifest: { path: manifest },
-          source: { path: join(root, "files", "modules", "main.js") },
-          source_map: {
-            path: map,
-            sha256: createHash("sha256")
-              .update(fixture.sourceMap.text)
-              .digest("hex"),
-          },
-        },
-      },
-    });
+    expectCliParityResult(response, parity);
+    const client = await connectSourceLocationClient(map);
+    await expectMcpParity(client, response.json, parity);
+    await expectOutOfRangeLine(cli, parity);
   },
   // Allow cold CLI and MCP ownership preparation across the full parity sequence.
   180_000,
