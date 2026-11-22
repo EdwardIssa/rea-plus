@@ -1164,6 +1164,7 @@
 * **cli:** cover Frida argument admission and spawn ordering ([#3356](https://github.com/EdwardIssa/rea-plus/issues/3356)) ([c7fce66](https://github.com/EdwardIssa/rea-plus/commit/c7fce66035a4eba490157b4ec3f43b1a7515aa99))
 * **cli:** cover literal Markdown heading output ([#7866](https://github.com/EdwardIssa/rea-plus/issues/7866)) ([c2cc7e6](https://github.com/EdwardIssa/rea-plus/commit/c2cc7e6eb0979303ae78c7146b2705b7181e8dd6))
 * **desktop:** cover ENOTDIR intermediate path refusal ([#8692](https://github.com/EdwardIssa/rea-plus/issues/8692)) ([a56cc93](https://github.com/EdwardIssa/rea-plus/commit/a56cc93cabe81242dcadaee85a129a14fc05bd2a))
+* **dynamic-execution:** s4 different-image escapee proves the subreaper load-bearing ([80ed326](https://github.com/EdwardIssa/rea-plus/commit/80ed326e68e550c72aae4ffd881c1a45fa704e51))
 * **electron:** consolidate handler presence coverage in public workflows ([19082ac](https://github.com/EdwardIssa/rea-plus/commit/19082acddbb3ddab5e381274ca38dcecbc292723))
 * **electron:** remove duplicate graph protocol fixture ([e8cb717](https://github.com/EdwardIssa/rea-plus/commit/e8cb71740b40a574a328d3cc778784662090c2ac))
 * **elf:** cover big-endian ABI notes through CLI and MCP ([#8803](https://github.com/EdwardIssa/rea-plus/issues/8803)) ([9a68ce5](https://github.com/EdwardIssa/rea-plus/commit/9a68ce57a0891551c3494bcdb945f81a987aadd6))
