@@ -9,7 +9,10 @@ import {
   buildClaimCheckReport,
   type ClaimCheckOutcome,
 } from "../../../src/domain/claimCheck/claimCheckReport.js";
-import { STRING_CLAIM_VALIDATOR } from "../../../src/domain/claimCheck/stringClaimValidator.js";
+import {
+  adjudicationReasonSchema,
+  STRING_CLAIM_VALIDATOR,
+} from "../../../src/domain/claimCheck/stringClaimValidator.js";
 import { createEvidence } from "../../../src/domain/evidence.js";
 import {
   buildClaimCheckFixture,
@@ -53,7 +56,9 @@ const truthOutcomes = (
         claim_id: entry.claim_id,
         claim_version: entry.claim_version,
         state: entry.state,
-        reason: entry.reason,
+        // This ledger is string-class only; the ledger reason union is wider
+        // than the string report's vocabulary, so narrow through its schema.
+        reason: adjudicationReasonSchema.parse(entry.reason),
       }));
   });
 
