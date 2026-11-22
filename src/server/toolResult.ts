@@ -11,10 +11,13 @@ import { jsonValueSchema, type JsonValue } from "../domain/jsonValue.js";
 /** Compose native Evidence continuation with the selected, parsed response budget. */
 export const createToolResultDelivery = (
   maximumResponseBytes: number | undefined,
+  spilloverTruncationEnabled = false,
 ): ToolResultDelivery =>
   new ToolResultDelivery(
     maximumResponseBytes ?? STDIO_DEFAULT_MAX_BUFFER_SIZE,
     retainedEvidenceContinuation,
+    undefined,
+    { spilloverTruncationEnabled },
   );
 
 /**
