@@ -1,3 +1,7 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 import type { JsonValue } from "../jsonValue.js";
@@ -52,6 +56,26 @@ describe("runtime observation derivation", () => {
       expect(derived.observations).toEqual([]);
       expect(derived.packReadyFound).toBe(false);
       expect(derived.packVersion).toBeNull();
+    }
+  });
+});
+
+describe("runtime derivation independence", () => {
+  // The phantom-row guarantee is structural: the validator's re-derivation
+  // must be its own implementation, so a defect in the producer's filing
+  // cannot reproduce itself inside the check. Behavioral equivalence on
+  // well-formed logs is expected and proves nothing; this source audit is
+  // the load-bearing guard, and it fails the moment the derivation (or the
+  // validator) imports the producer's filing code.
+  it("derives observations without importing the producer's filing code", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    for (const module of [
+      "runtimeObservationDerivation.ts",
+      "runtimeReplayValidator.ts",
+    ]) {
+      const source = readFileSync(join(here, module), "utf8");
+      expect(source, module).not.toMatch(/dynamicExecution/u);
+      expect(source, module).not.toMatch(/fileDynamicObservations/u);
     }
   });
 });
