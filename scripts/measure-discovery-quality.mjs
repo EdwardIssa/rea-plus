@@ -281,12 +281,15 @@ const overheadBenchmark = async () => {
     }
   };
   // One warm-up connect per surface, then the measured run per surface.
-  for (const environment of [{}, { REA_MCP_TOOL_SURFACE: "lazy" }]) {
+  for (const environment of [
+    { REA_MCP_TOOL_SURFACE: "full" },
+    { REA_MCP_TOOL_SURFACE: "lazy" },
+  ]) {
     const { client, server } = await connect(environment);
     await client.close();
     await server.close();
   }
-  const full = await run({}, false);
+  const full = await run({ REA_MCP_TOOL_SURFACE: "full" }, false);
   const lazy = await run({ REA_MCP_TOOL_SURFACE: "lazy" }, true);
   return { full, lazy };
 };
