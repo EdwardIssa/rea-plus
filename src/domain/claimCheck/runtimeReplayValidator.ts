@@ -94,7 +94,9 @@ export interface RuntimeGroupRecord {
   readonly execution: {
     readonly supervisorReason: string;
     readonly resumeObserved: boolean;
-    readonly containmentBreach: boolean;
+    /** True: breach recorded. False: containment verified clean. Null:
+     * containment unverified — not a clean witness (fail-closed). */
+    readonly containmentBreach: boolean | null;
     readonly survivorsAfter: readonly string[];
     /** Hooks the run reported missing, or null when it reported no pack. */
     readonly packReadyMissing: readonly string[] | null;
@@ -149,9 +151,13 @@ export const witnessIneligibility = (
 ): WitnessIneligibilityCause | null => {
   const { execution, limitations } = record;
   if (
-    execution.containmentBreach ||
+    execution.containmentBreach !== false ||
     execution.survivorsAfter.length > 0 ||
-    limitations.some((entry) => entry.startsWith("containment_breach:"))
+    limitations.some(
+      (entry) =>
+        entry.startsWith("containment_breach:") ||
+        entry.startsWith("containment_unverified"),
+    )
   )
     return "containment";
   if (

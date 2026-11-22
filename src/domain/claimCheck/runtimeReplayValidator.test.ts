@@ -51,7 +51,7 @@ interface RecordOptions {
   readonly limitations?: readonly string[];
   readonly supervisorReason?: string;
   readonly resumeObserved?: boolean;
-  readonly containmentBreach?: boolean;
+  readonly containmentBreach?: boolean | null;
   readonly survivorsAfter?: readonly string[];
   readonly packReadyMissing?: readonly string[] | null;
   readonly hookPackVersion?: string;
@@ -76,7 +76,10 @@ const record = (options: RecordOptions = {}): RuntimeGroupRecord => {
     execution: {
       supervisorReason: options.supervisorReason ?? "exited",
       resumeObserved: options.resumeObserved ?? true,
-      containmentBreach: options.containmentBreach ?? false,
+      containmentBreach:
+        options.containmentBreach === undefined
+          ? false
+          : options.containmentBreach,
       survivorsAfter: options.survivorsAfter ?? [],
       packReadyMissing: options.packReadyMissing ?? [],
       hookPackVersion: options.hookPackVersion ?? "1.1.0",
@@ -121,6 +124,28 @@ describe("runtime replay validator", () => {
     expect(verdict.observed.eligible_witnesses).toBe(2);
     expect(verdict.observed.recurring_witnesses).toBe(2);
     expect(accounting.eligible_witnesses).toBe(2);
+  });
+
+  it("excludes a witness whose containment is unverified (breach null)", () => {
+    const claim = claimFor("alpha-secret-one");
+    const source = record({
+      filed: [obs("alpha-secret-one")],
+      derived: [obs("alpha-secret-one")],
+    });
+    const clean = record({ derived: [obs("alpha-secret-one")] });
+    const unverified = record({
+      derived: [obs("alpha-secret-one")],
+      containmentBreach: null,
+    });
+    const { verdict, accounting } = verdictOf(
+      [claim],
+      [source, clean, unverified],
+      "alpha-secret-one",
+    );
+    expect(verdict.state).toBe("unknown");
+    expect(verdict.reason).toBe("recurrence_unconfirmed");
+    expect(accounting.eligible_witnesses).toBe(1);
+    expect(accounting.ineligibility_by_cause.containment).toBe(1);
   });
 
   it("leaves a claim unconfirmed with fewer than two witnesses", () => {

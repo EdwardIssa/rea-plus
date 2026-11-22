@@ -58,7 +58,13 @@ const dynResult = (options: RecordOptions) => ({
       deadline_ms: 75000,
       rss_cap_bytes: 3221225472,
     },
-    containment: { survivors_after: [], breach: false },
+    containment: {
+      verified: true,
+      source: "subreaper_accounting",
+      survivors_after: [],
+      breach: false,
+      reaped_descendants: [],
+    },
   },
 });
 
