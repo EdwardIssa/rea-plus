@@ -8,11 +8,9 @@ import type { AnalysisError } from "../../domain/analysisErrorBase.js";
 import { AnalysisInputError } from "../../domain/analysisErrorCore.js";
 import { parseEvidence, type Evidence } from "../../domain/evidence.js";
 import { analysisInputErrorFromIssues } from "../../domain/inputIssueProjection.js";
-import { digestSchema } from "../../domain/digests.js";
 import { err, ok, type Result } from "../../domain/result.js";
 import { safeParseJson } from "../../domain/safeJson.js";
 import {
-  claimCheckLedgerSchema,
   createClaimCheckLedgerWriter,
   type ClaimCheckLedger,
 } from "../../domain/claimCheck/claimCheckLedger.js";
@@ -33,20 +31,11 @@ import {
   type ArtifactRangeReader,
 } from "./elfBytePort.js";
 
-/** What one completed claim-check run delivers to its surfaces. */
-export const claimCheckRunOutcomeSchema = z.strictObject({
-  ledger: claimCheckLedgerSchema,
-  ledger_path: z.string().nullable(),
-  claims_considered: z.int().min(0),
-  counts: z.strictObject({
-    supported: z.int().min(0),
-    refuted: z.int().min(0),
-    unknown: z.int().min(0),
-  }),
-  stale_marked: z.int().min(0),
-  report_digest: digestSchema,
-});
-export type ClaimCheckRunOutcome = z.infer<typeof claimCheckRunOutcomeSchema>;
+import {
+  claimCheckRunOutcomeSchema,
+  type ClaimCheckRunOutcome,
+} from "../../domain/claimCheck/claimCheckReport.js";
+export { claimCheckRunOutcomeSchema, type ClaimCheckRunOutcome };
 
 export interface ClaimCheckRunRequest {
   /** Raw Evidence JSON values; each is authenticated before any claim is derived. */

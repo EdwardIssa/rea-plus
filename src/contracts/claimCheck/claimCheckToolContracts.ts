@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { claimCheckRunOutcomeSchema } from "../../application/claimCheck/runClaimCheck.js";
+import { claimCheckRunOutcomeSchema } from "../../domain/claimCheck/claimCheckReport.js";
 import { localPathStringSchema } from "../../domain/localPath.js";
 import type { ToolContract } from "../toolContractTypes.js";
 import { toolContractMetadata } from "../toolEffects.js";

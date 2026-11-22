@@ -7,6 +7,7 @@ import {
   type AdjudicationReason,
   type AdjudicationState,
 } from "./stringClaimValidator.js";
+import { claimCheckLedgerSchema } from "./claimCheckLedger.js";
 
 const reasonCountsSchema = z.strictObject({
   bytes_match: z.int().min(0),
@@ -56,6 +57,21 @@ export const claimCheckReportSchema = z.strictObject({
   verdicts: z.array(claimCheckVerdictLineSchema),
 });
 export type ClaimCheckReport = z.infer<typeof claimCheckReportSchema>;
+
+/** What one completed claim-check run delivers to its surfaces. */
+export const claimCheckRunOutcomeSchema = z.strictObject({
+  ledger: claimCheckLedgerSchema,
+  ledger_path: z.string().nullable(),
+  claims_considered: z.int().min(0),
+  counts: z.strictObject({
+    supported: z.int().min(0),
+    refuted: z.int().min(0),
+    unknown: z.int().min(0),
+  }),
+  stale_marked: z.int().min(0),
+  report_digest: digestSchema,
+});
+export type ClaimCheckRunOutcome = z.infer<typeof claimCheckRunOutcomeSchema>;
 
 /** One outcome the report aggregates; truth_state is set only on truth sets. */
 export interface ClaimCheckOutcome {
