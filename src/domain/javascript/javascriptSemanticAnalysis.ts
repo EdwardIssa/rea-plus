@@ -730,6 +730,25 @@ function* classifyDefinitionReceiversSteps(
           /^\d+$/u.test(member.property.value)
         ? Number.parseInt(member.property.value, 10)
         : null;
+  // The dependency a Metro dependency map names at an index: an array
+  // element, or — in the object form Metro emits for sparse maps — the
+  // property whose key is the index spelled as a string. Object-form maps
+  // also carry non-index entries (e.g. `paths`), which never match; a
+  // repeated key's last property wins, as in object evaluation.
+  const metroDependencyElement = (
+    deps: t.Node,
+    dependencyIndex: number,
+  ): t.Node | null | undefined => {
+    if (t.isArrayExpression(deps)) return deps.elements[dependencyIndex];
+    if (!t.isObjectExpression(deps)) return undefined;
+    let element: t.Node | undefined;
+    for (const property of deps.properties) {
+      if (!t.isObjectProperty(property)) continue;
+      const key = semanticStaticPropertyKey(property.key, property.computed);
+      if (key === String(dependencyIndex)) element = property.value;
+    }
+    return element;
+  };
   // The `__d(factory, id, deps)` call enclosing a node, when the nearest
   // enclosing function is the factory argument of a Metro `__d` call.
   const metroDefineCallFor = (
@@ -830,9 +849,9 @@ function* classifyDefinitionReceiversSteps(
     )
       return { requestedModuleKey: null, dependencyIndex };
     const deps = define.arguments[2];
-    if (!t.isArrayExpression(deps))
+    if (deps === undefined)
       return { requestedModuleKey: null, dependencyIndex };
-    const element = deps.elements[dependencyIndex];
+    const element = metroDependencyElement(deps, dependencyIndex);
     return {
       requestedModuleKey:
         element === null || element === undefined
