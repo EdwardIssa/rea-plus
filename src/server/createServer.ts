@@ -8,6 +8,7 @@ import { AnalysisSettings } from "../application/AnalysisSettings.js";
 import { parseMcpInputBudget } from "../config/mcpInputBudget.js";
 import { registerAnalysisSettingsTools } from "./registerAnalysisSettingsTools.js";
 import { registerClaimCheckTool } from "./registerClaimCheckTool.js";
+import { registerRuntimeClaimCheckTool } from "./registerRuntimeClaimCheckTool.js";
 import { registerDynamicExecutionTool } from "./registerDynamicExecutionTool.js";
 import { registerDevicetreeTool } from "./registerDevicetreeTool.js";
 import { registerGpuCodeObjectsTools } from "./registerGpuCodeObjectsTools.js";
@@ -775,6 +776,7 @@ export const createServer = (
     application: () => {
       registerAnalysisSettingsTools(server, analysisSettings);
       registerClaimCheckTool(server);
+      registerRuntimeClaimCheckTool(server);
       registerDynamicExecutionTool(server);
       registerAnalysisViewTool(
         server,

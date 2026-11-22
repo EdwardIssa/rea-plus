@@ -55,6 +55,7 @@ export const TOOL_EFFECTS: Readonly<Record<string, ToolEffects>> = {
   inspect_analysis_settings: effects(),
   update_analysis_settings: effects({ mutatesSession: true }),
   adjudicate_string_claims: effects({ writesFilesystem: true }),
+  adjudicate_runtime_claims: effects({ writesFilesystem: true }),
   execute_dynamically: effects({
     executesForeignCode: true,
     launchesProcess: true,

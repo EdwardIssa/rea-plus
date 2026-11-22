@@ -38,6 +38,7 @@ import { ELECTRON_TOOL_CONTRACTS } from "./javascript/electronToolContracts.js";
 import { JAVASCRIPT_RUNTIME_OBSERVATION_TOOL_CONTRACTS } from "./javascript/javascriptRuntimeObservationToolContracts.js";
 import { APPLICATION_TOOL_CONTRACTS } from "./applicationToolContracts.js";
 import { CLAIM_CHECK_TOOL_CONTRACTS } from "./claimCheck/claimCheckToolContracts.js";
+import { RUNTIME_CLAIM_CHECK_TOOL_CONTRACTS } from "./claimCheck/runtimeClaimCheckToolContracts.js";
 import { DYNAMIC_EXECUTION_TOOL_CONTRACTS } from "./dynamicExecution/dynamicExecutionToolContracts.js";
 import { WEB_SCRIPT_TOOL_CONTRACTS } from "./webScriptToolContracts.js";
 import { WEB_RUNTIME_TOOL_CONTRACTS } from "./webRuntimeToolContracts.js";
@@ -66,6 +67,7 @@ export const TOOL_CONTRACT_GROUPS = {
   BROWSER_TOOL_CONTRACTS,
   CAPTURE_TOOL_CONTRACTS,
   CLAIM_CHECK_TOOL_CONTRACTS,
+  RUNTIME_CLAIM_CHECK_TOOL_CONTRACTS,
   CUTTER_TOOL_CONTRACTS,
   DESKTOP_APPLICATION_TOOL_CONTRACTS,
   DYNAMIC_EXECUTION_TOOL_CONTRACTS,
@@ -235,6 +237,7 @@ export const TOOL_FAMILY_DEFINITIONS = [
     contracts: [
       ...TOOL_CONTRACT_GROUPS.APPLICATION_TOOL_CONTRACTS,
       ...TOOL_CONTRACT_GROUPS.CLAIM_CHECK_TOOL_CONTRACTS,
+      ...TOOL_CONTRACT_GROUPS.RUNTIME_CLAIM_CHECK_TOOL_CONTRACTS,
       ...TOOL_CONTRACT_GROUPS.DYNAMIC_EXECUTION_TOOL_CONTRACTS,
       ...TOOL_CONTRACT_GROUPS.ANALYSIS_SETTINGS_TOOL_CONTRACTS,
       ...TOOL_CONTRACT_GROUPS.ENVIRONMENT_TOOL_CONTRACTS,
