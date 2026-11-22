@@ -227,12 +227,14 @@ export class GhidraClient {
             );
             return err(
               await this.#withMemoryCgroupEvidence(
-                this.#refreshProcessFailure(
-                  result.error,
-                  owner,
-                  checkpoint,
-                  token,
-                  !drained,
+                this.#withSupervisorEvidence(
+                  this.#refreshProcessFailure(
+                    result.error,
+                    owner,
+                    checkpoint,
+                    token,
+                    !drained,
+                  ),
                 ),
               ),
             );
@@ -1455,6 +1457,25 @@ export class GhidraClient {
 
   #readMemoryCgroup(): Promise<LinuxCgroupMemoryState | undefined> {
     return (this.#options.readMemoryCgroup ?? readLinuxCgroupMemoryState)();
+  }
+
+  /**
+   * Attach the worker supervisor's terminal observation to a process or
+   * protocol failure, so a watchdog kill is reported with its reason
+   * (deadline or memory) instead of an unexplained process death. When the
+   * supervisor has not settled, the failure is returned unchanged.
+   */
+  #withSupervisorEvidence(failure: GhidraSessionError): GhidraSessionError {
+    const outcome = this.#launch?.supervisor?.snapshot();
+    if (outcome === undefined) return failure;
+    return failure.withDiagnostics({
+      ...failure.diagnostics,
+      worker_supervisor: {
+        reason: outcome.reason,
+        peak_rss_bytes: outcome.peakRssBytes ?? null,
+        wall_ms: outcome.wallMs,
+      },
+    });
   }
 
   /**

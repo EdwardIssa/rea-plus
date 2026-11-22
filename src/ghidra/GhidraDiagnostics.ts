@@ -55,6 +55,7 @@ export const createGhidraDiagnostics = (
     }
     return history;
   }
+  const supervisorOutcome = options.launch?.supervisor?.snapshot();
   return {
     ...(options.scope === "request" ? { diagnostic_scope: "request" } : {}),
     target_path: options.targetPath,
@@ -94,6 +95,15 @@ export const createGhidraDiagnostics = (
     ...(options.launch?.configuredMaxHeap === undefined
       ? {}
       : { configured_jvm_max_heap: options.launch.configuredMaxHeap }),
+    ...(supervisorOutcome === undefined
+      ? {}
+      : {
+          worker_supervisor: {
+            reason: supervisorOutcome.reason,
+            peak_rss_bytes: supervisorOutcome.peakRssBytes ?? null,
+            wall_ms: supervisorOutcome.wallMs,
+          },
+        }),
     ...(options.snapshot === undefined
       ? {}
       : {

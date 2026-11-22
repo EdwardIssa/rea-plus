@@ -58,6 +58,10 @@ import {
   inspectGhidraPspExtension,
   type GhidraPspExtension,
 } from "./GhidraPspExtension.js";
+import {
+  GhidraWorkerSupervisor,
+  resolveGhidraWorkerRssCap,
+} from "./GhidraWorkerSupervisor.js";
 
 export interface GhidraLaunchSession {
   readonly runtimeRoot: string;
@@ -79,6 +83,12 @@ export type GhidraLaunch = ProviderProcessLaunch & {
   /** Value supplied to the JVM as -Xmx, not a measurement of effective memory. */
   readonly configuredMaxHeap?: string;
   readonly launchSupport?: readonly GhidraLaunchSupportDiagnostic[];
+  /**
+   * Live supervisor for the spawned worker, present on successful launches
+   * whose process handle supports exit observation. Its outcome names why
+   * the worker settled (deadline, memory, exited, crashed, stopped).
+   */
+  readonly supervisor?: GhidraWorkerSupervisor;
 };
 
 /** Same per-stream projection budget for helper warnings and failed commands. */
@@ -560,13 +570,13 @@ export class GhidraHeadlessLauncher implements GhidraLauncher {
           throw new AnalysisCancelledError("open_binary", { cause });
         throw cause;
       });
-      const partialLaunch = ownedGhidraLaunch(
-        started,
+      const partialLaunch = supervisedGhidraLaunch({
+        spawned: started,
         paths,
         platform,
         launchSupport,
-        configuredMaxHeap,
-      );
+        ...(configuredMaxHeap === undefined ? {} : { configuredMaxHeap }),
+      });
       await writeGhidraRuntimeFile(
         paths.ownershipPath,
         `${JSON.stringify({
@@ -696,6 +706,51 @@ const ownedGhidraProcess = (
   ownership: spawned.ownership,
   cleanup: () => cleanupStartedProcess(spawned, platform),
 });
+
+/**
+ * Successful launches are supervised: the worker's process tree is polled
+ * against the RSS cap resolved above its configured heap, and a breach runs
+ * the owned termination cascade as a whole. The launch cleanup marks the
+ * supervisor's stop first so a normal session end settles as `stopped`.
+ */
+const supervisedGhidraLaunch = (input: {
+  readonly spawned: SpawnedOwnedProviderProcess;
+  readonly paths: ReturnType<typeof ghidraRuntimePaths>;
+  readonly platform: NodeJS.Platform;
+  readonly launchSupport: readonly GhidraLaunchSupportDiagnostic[];
+  readonly configuredMaxHeap?: string;
+}): GhidraLaunch => {
+  const { spawned, paths, platform, launchSupport, configuredMaxHeap } = input;
+  const launch: GhidraLaunch = {
+    ...ownedGhidraProcess(spawned, platform),
+    projectRoot: paths.projectRoot,
+    ghidraLogPath: paths.ghidraLogPath,
+    scriptLogPath: paths.scriptLogPath,
+    ...(configuredMaxHeap === undefined ? {} : { configuredMaxHeap }),
+    ...(launchSupport.length === 0
+      ? {}
+      : { launchSupport: [...launchSupport] }),
+  };
+  if (typeof spawned.process.once !== "function") return launch;
+  const supervisor = new GhidraWorkerSupervisor(spawned.process, {
+    rssCapBytes: resolveGhidraWorkerRssCap(
+      configuredMaxHeap === undefined ? {} : { configuredMaxHeap },
+    ),
+    pollIntervalMs: 1000,
+    terminateGroup: async () => {
+      await cleanupStartedProcess(spawned, platform);
+    },
+  });
+  supervisor.start();
+  return {
+    ...launch,
+    supervisor,
+    cleanup: async () => {
+      supervisor.noteOwnerStop();
+      return cleanupStartedProcess(spawned, platform);
+    },
+  };
+};
 
 /** Exact executable and argv passed to shell-free process creation. */
 export interface GhidraHeadlessCommand {
