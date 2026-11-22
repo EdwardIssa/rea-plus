@@ -10,6 +10,14 @@
  */
 export const HOOK_PACK_VERSION = "1.1.0";
 
+/**
+ * The Frida API major line this pack is tested against
+ * (Module.getGlobalExportByName; getExportByName was removed in 17). A
+ * loaded binding whose major differs refuses before spawn, naming both
+ * versions; minor/patch skew proceeds and is recorded.
+ */
+export const HOOK_PACK_TESTED_FRIDA_MAJOR = 17;
+
 export const HOOK_PACK_SOURCE = `
 "use strict";
 const PACK_VERSION = "${HOOK_PACK_VERSION}";

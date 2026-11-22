@@ -2,6 +2,8 @@ import { projectCliAnalysisResult } from "./projectCliAnalysisResult.js";
 import { z } from "incur";
 
 import { FridaInstrumentationService } from "../application/frida/FridaInstrumentationService.js";
+import { runDynamicExecutionCommand } from "../application/dynamicExecution/runDynamicExecution.js";
+import { localPathStringSchema } from "../domain/localPath.js";
 import type {
   FridaInstrumentationPort,
   FridaRemoteConnection,
@@ -286,6 +288,105 @@ export const registerFridaCommands = (
             "instrument_with_frida",
             signal,
           ).then(projectCliAnalysisResult);
+        }),
+      ),
+  });
+  cli.command(CLI_COMMANDS.executeDynamically, {
+    description:
+      "Execute one local target once under namespace isolation with the shipped Frida hook pack and write the runtime observations as an Evidence record; rated for analyst-designated targets on the analyst's own machine",
+    args: z.object({
+      target: localPathStringSchema.describe(
+        "Local target executable to run once under supervision",
+      ),
+      evidence: localPathStringSchema.describe("Evidence JSON output path"),
+    }),
+    options: z.object({
+      argument: z
+        .array(z.string())
+        .optional()
+        .describe("Stimulus arguments passed to the target"),
+      env: z
+        .array(z.string())
+        .optional()
+        .describe(
+          "Environment entries for the target as KEY=VALUE, added to the scrubbed allowlist environment",
+        ),
+      sessionTimeoutMs: z
+        .number()
+        .int()
+        .min(1_000)
+        .max(600_000)
+        .optional()
+        .describe("Worker session timeout in milliseconds (default 30000)"),
+      deadlineMs: z
+        .number()
+        .int()
+        .positive()
+        .max(900_000)
+        .optional()
+        .describe(
+          "Supervisor wall-clock deadline in milliseconds; must exceed the session timeout (default: session timeout + 45000)",
+        ),
+      rssCapBytes: z
+        .number()
+        .int()
+        .min(268_435_456)
+        .optional()
+        .describe(
+          "Supervisor process-tree RSS cap in bytes (default 3221225472 = 3 GiB)",
+        ),
+    }),
+    run: ({ args, options }) =>
+      withCommandCancellation((signal) =>
+        logCliCommand(logger, CLI_COMMANDS.executeDynamically, async () => {
+          const envSet: Record<string, string> = {};
+          for (const entry of options.env ?? []) {
+            const eq = entry.indexOf("=");
+            if (eq <= 0)
+              return {
+                error: "Analysis failed",
+                ...projectAnalysisError(
+                  new AnalysisInputError(
+                    CLI_COMMANDS.executeDynamically,
+                    undefined,
+                    [
+                      {
+                        path: ["env"],
+                        reason: "invalid_format",
+                        message: `--env entries must be KEY=VALUE; got: ${entry}`,
+                      },
+                    ],
+                  ),
+                ),
+              };
+            envSet[entry.slice(0, eq)] = entry.slice(eq + 1);
+          }
+          const ran = await runDynamicExecutionCommand(
+            {
+              targetPath: args.target,
+              evidencePath: args.evidence,
+              ...(options.argument === undefined
+                ? {}
+                : { argv: options.argument }),
+              ...(options.env === undefined ? {} : { envSet }),
+              ...(options.sessionTimeoutMs === undefined
+                ? {}
+                : { sessionTimeoutMs: options.sessionTimeoutMs }),
+              ...(options.deadlineMs === undefined
+                ? {}
+                : { deadlineMs: options.deadlineMs }),
+              ...(options.rssCapBytes === undefined
+                ? {}
+                : { rssCapBytes: options.rssCapBytes }),
+            },
+            signal,
+          );
+          return ran.ok
+            ? ran.value
+            : {
+                error: "Analysis failed",
+                ...projectAnalysisError(ran.error),
+              };
         }),
       ),
   });

@@ -55,6 +55,12 @@ export const TOOL_EFFECTS: Readonly<Record<string, ToolEffects>> = {
   inspect_analysis_settings: effects(),
   update_analysis_settings: effects({ mutatesSession: true }),
   adjudicate_string_claims: effects({ writesFilesystem: true }),
+  execute_dynamically: effects({
+    executesForeignCode: true,
+    launchesProcess: true,
+    writesFilesystem: true,
+    idempotent: false,
+  }),
   list_cutter_sessions: effects({ accessesNetwork: true }),
   cutter_command: effects({
     mutatesTarget: true,
