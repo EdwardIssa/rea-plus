@@ -94,42 +94,248 @@ const sharesPrefix = (left: string, right: string): boolean =>
   (left.startsWith(right) || right.startsWith(left));
 
 /**
- * Score one token set against a query token: full weight for a stemmed
- * exact match, half weight for a prefix relative (call ~ callers,
- * entropi ~ entropy), else zero.
+ * Query words that carry no intent signal in this catalog. They are
+ * dropped from the query side only; index text keeps every token. A
+ * query made only of these words matches nothing rather than ranking
+ * the whole catalog by prose overlap.
  */
-const tokenScore = (
-  tokens: ReadonlySet<string>,
-  queryToken: string,
-  weight: number,
-): number => {
-  if (tokens.has(queryToken)) return weight;
-  for (const token of tokens)
-    if (sharesPrefix(token, queryToken)) return Math.floor(weight / 2);
-  return 0;
+const QUERY_STOPWORDS: ReadonlySet<string> = new Set([
+  "a", "about", "am", "an", "and", "any", "are", "as", "at", "be", "been",
+  "between", "by", "can", "could", "did", "do", "does", "done", "for",
+  "from", "he", "her", "his", "how", "i", "if", "in", "into", "is", "it",
+  "its", "me", "my", "no", "not", "of", "on", "or", "our", "over", "per",
+  "shall", "she", "should", "so", "such", "than", "that", "the", "their",
+  "them", "then", "these", "they", "this", "those", "to", "under", "via",
+  "was", "we", "were", "what", "when", "where", "which", "who", "whom",
+  "whose", "why", "will", "with", "would", "you", "your",
+]);
+
+/**
+ * Curated query-side equivalences between the words analysts type and
+ * the vocabulary tool names are built from. Keys are raw (unstemmed)
+ * query tokens; values are extra index tokens scored alongside the
+ * query token's own stem at a discount. The map stays deliberately
+ * small and domain-shaped: verbs of display and mutation, the guidance
+ * corpus's own synonyms, and format words users substitute for the
+ * catalog's terms.
+ */
+const QUERY_SYNONYMS: ReadonlyMap<string, readonly string[]> = new Map([
+  ["change", ["update"]],
+  ["config", ["setting"]],
+  ["configuration", ["setting"]],
+  ["cross", ["xref"]],
+  ["decode", ["demangle"]],
+  ["doc", ["guidance"]],
+  ["docs", ["guidance"]],
+  ["documentation", ["guidance"]],
+  ["enumerate", ["list"]],
+  ["executable", ["binary"]],
+  ["file", ["binary"]],
+  ["function", ["procedure"]],
+  ["functions", ["procedure"]],
+  ["guide", ["guidance"]],
+  ["mangle", ["demangle"]],
+  ["mangled", ["demangle"]],
+  ["modify", ["update"]],
+  ["open", ["read"]],
+  ["packed", ["entropy"]],
+  ["page", ["section"]],
+  ["reference", ["xref"]],
+  ["references", ["xref"]],
+  ["show", ["list"]],
+]);
+
+/** Weight kept by a match that arrives through a synonym expansion. */
+const SYNONYM_DISCOUNT = 0.75;
+
+/**
+ * Whether two tokens are within one Damerau edit: a single insertion,
+ * deletion, substitution, or adjacent transposition. Catches the
+ * misspellings analysts actually type (serach, guidence, architecure)
+ * without the false positives a wider radius admits.
+ */
+const withinOneEdit = (left: string, right: string): boolean => {
+  const lengthDelta = left.length - right.length;
+  if (lengthDelta < -1 || lengthDelta > 1) return false;
+  if (lengthDelta === 0) {
+    let first = -1;
+    let second = -1;
+    for (let index = 0; index < left.length; index += 1) {
+      if (left[index] === right[index]) continue;
+      if (first === -1) first = index;
+      else if (second === -1) second = index;
+      else return false;
+    }
+    if (second === -1) return true;
+    return (
+      second === first + 1 &&
+      left[first] === right[second] &&
+      left[second] === right[first]
+    );
+  }
+  const [shorter, longer] = lengthDelta < 0 ? [left, right] : [right, left];
+  let shortIndex = 0;
+  let longIndex = 0;
+  let skipped = false;
+  while (shortIndex < shorter.length) {
+    if (shorter[shortIndex] === longer[longIndex]) {
+      shortIndex += 1;
+      longIndex += 1;
+    } else {
+      if (skipped) return false;
+      skipped = true;
+      longIndex += 1;
+    }
+  }
+  return true;
 };
 
-/** Score one entry against query tokens; higher is a better intent match. */
-const scoreEntry = (
-  entry: AdvertisedToolEntry,
-  queryTokens: ReadonlySet<string>,
-  rawQuery: string,
+/** A token match against one field: quality 1 exact, 0.7 fuzzy, 0.5 prefix. */
+interface TokenMatch {
+  readonly quality: number;
+  readonly token: string;
+}
+
+/**
+ * Best match of one index token in a field's token set. Fuzzy matching
+ * (one edit) applies only where the caller allows it: names and
+ * families are small curated vocabularies where a misspelling has one
+ * plausible target; prose is not.
+ */
+const bestMatch = (
+  tokens: ReadonlySet<string>,
+  token: string,
+  fuzzy: boolean,
+): TokenMatch | undefined => {
+  if (tokens.has(token)) return { quality: 1, token };
+  let best: TokenMatch | undefined;
+  for (const candidate of tokens) {
+    if (sharesPrefix(candidate, token)) {
+      if (best === undefined || best.quality < 0.5)
+        best = { quality: 0.5, token: candidate };
+    } else if (
+      fuzzy &&
+      token.length >= 5 &&
+      candidate.length >= 5 &&
+      withinOneEdit(candidate, token)
+    ) {
+      if (best === undefined || best.quality < 0.7)
+        best = { quality: 0.7, token: candidate };
+    }
+  }
+  return best;
+};
+
+/** One catalog entry with its indexed token sets, built per search. */
+interface IndexedEntry {
+  readonly entry: AdvertisedToolEntry;
+  readonly nameTokens: ReadonlySet<string>;
+  readonly familyTokens: ReadonlySet<string>;
+  readonly textTokens: ReadonlySet<string>;
+}
+
+const indexEntry = (entry: AdvertisedToolEntry): IndexedEntry => ({
+  entry,
+  nameTokens: stemmedTokens(entry.name),
+  familyTokens: stemmedTokens(entry.family ?? ""),
+  textTokens: new Set([
+    ...stemmedTokens(entry.title ?? ""),
+    ...stemmedTokens(entry.description ?? ""),
+  ]),
+});
+
+/**
+ * Rarity weight for a matched token: how much of the catalog mentions
+ * it. A token in every description (binary, analysis) carries little
+ * intent signal; a token in a handful (guidance, entropy) carries the
+ * query. The factor keeps a floor so common-token matches still count.
+ */
+const rarityFactor = (
+  token: string,
+  documentFrequency: ReadonlyMap<string, number>,
+  entryCount: number,
 ): number => {
+  const frequency = documentFrequency.get(token) ?? 0;
+  const idf = Math.log(1 + entryCount / (frequency + 1));
+  const idfMax = Math.log(1 + entryCount);
+  return 0.35 + 0.65 * (idf / idfMax);
+};
+
+/** Catalog-wide token statistics one search scores against. */
+interface IndexStatistics {
+  readonly documentFrequency: ReadonlyMap<string, number>;
+  readonly entryCount: number;
+}
+
+/** Score one entry against expanded query tokens; higher is better. */
+const scoreEntry = (
+  indexed: IndexedEntry,
+  queryTokens: readonly string[],
+  rawQuery: string,
+  statistics: IndexStatistics,
+): number => {
+  const { documentFrequency, entryCount } = statistics;
+  const { entry, nameTokens, familyTokens, textTokens } = indexed;
   let score = 0;
   if (entry.name === rawQuery) score += 100;
   if (entry.name.includes(rawQuery) && rawQuery.length >= 3) score += 25;
-  const nameTokens = stemmedTokens(entry.name);
-  const familyTokens = stemmedTokens(entry.family ?? "");
-  const textTokens = new Set([
-    ...stemmedTokens(entry.title ?? ""),
-    ...stemmedTokens(entry.description ?? ""),
-  ]);
-  for (const token of queryTokens) {
-    const queryToken = stem(token);
-    score += tokenScore(nameTokens, queryToken, 10);
-    score += tokenScore(familyTokens, queryToken, 5);
-    score += tokenScore(textTokens, queryToken, 3);
+  let nameQuality = 0;
+  for (const rawToken of queryTokens) {
+    const expanded: readonly { token: string; synonym: boolean }[] = [
+      { token: stem(rawToken), synonym: false },
+      ...(QUERY_SYNONYMS.get(rawToken) ?? []).map((token) => ({
+        token,
+        synonym: true,
+      })),
+    ];
+    const fieldScore = (
+      tokens: ReadonlySet<string>,
+      weight: number,
+      fuzzy: boolean,
+      exactOnlySynonyms: boolean,
+    ): number => {
+      let best = 0;
+      for (const { token, synonym } of expanded) {
+        const match = bestMatch(tokens, token, fuzzy);
+        if (match === undefined) continue;
+        if (exactOnlySynonyms && synonym && match.quality !== 1) continue;
+        const weighted =
+          weight *
+          match.quality *
+          rarityFactor(match.token, documentFrequency, entryCount) *
+          (synonym ? SYNONYM_DISCOUNT : 1);
+        if (weighted > best) best = weighted;
+      }
+      return best;
+    };
+    // The name match is chosen by quality first (an exact synonym beats
+    // a prefix relative of the typed word), then weighted like the rest.
+    let bestName: (TokenMatch & { readonly synonym: boolean }) | undefined;
+    for (const { token, synonym } of expanded) {
+      const match = bestMatch(nameTokens, token, true);
+      if (match === undefined) continue;
+      if (bestName === undefined || match.quality > bestName.quality)
+        bestName = { ...match, synonym };
+    }
+    if (bestName !== undefined) {
+      score +=
+        10 *
+        bestName.quality *
+        rarityFactor(bestName.token, documentFrequency, entryCount) *
+        (bestName.synonym ? SYNONYM_DISCOUNT : 1);
+      nameQuality += Math.min(
+        bestName.quality,
+        bestName.synonym ? 0.7 : 1,
+      );
+    }
+    score += fieldScore(familyTokens, 5, true, false);
+    score += fieldScore(textTokens, 3, false, true);
   }
+  // Coverage: a query that accounts for most of a short tool name is a
+  // stronger intent signal than the same matches scattered across a
+  // long one. Synonym and partial matches count at their quality.
+  if (nameTokens.size > 0)
+    score += 8 * (nameQuality / nameTokens.size);
   return score;
 };
 
@@ -187,13 +393,30 @@ export class McpToolSurface {
 
   /** Search the whole registered catalog by intent, best matches first. */
   search(query: string, limit: number): readonly ToolSearchMatch[] {
-    const queryTokens = new Set(tokenize(query));
+    const queryTokens = [
+      ...new Set(
+        tokenize(query).filter((token) => !QUERY_STOPWORDS.has(token)),
+      ),
+    ];
     const rawQuery = query.trim().toLowerCase();
-    return this.host
-      .entries()
-      .map((entry) => ({
-        entry,
-        score: scoreEntry(entry, queryTokens, rawQuery),
+    const indexed = this.host.entries().map(indexEntry);
+    const documentFrequency = new Map<string, number>();
+    for (const { nameTokens, familyTokens, textTokens } of indexed) {
+      const union = new Set([
+        ...nameTokens,
+        ...familyTokens,
+        ...textTokens,
+      ]);
+      for (const token of union)
+        documentFrequency.set(token, (documentFrequency.get(token) ?? 0) + 1);
+    }
+    return indexed
+      .map((indexedEntry) => ({
+        entry: indexedEntry.entry,
+        score: scoreEntry(indexedEntry, queryTokens, rawQuery, {
+          documentFrequency,
+          entryCount: indexed.length,
+        }),
       }))
       .filter(({ score }) => score > 0)
       .sort(
