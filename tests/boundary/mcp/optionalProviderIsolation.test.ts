@@ -57,7 +57,7 @@ const boot = async (
   const exitCodes: number[] = [];
   expect(
     await run({
-      env: {},
+      env: { REA_MCP_TOOL_SURFACE: "full" },
       loadOptionalProviders: async () => loaded,
       createServer: (source, options) => {
         if (source.kind !== "session")

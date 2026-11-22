@@ -71,7 +71,7 @@ cliTest(
       command: process.execPath,
       args: [resolve("scripts/rea.mjs"), "mcp"],
       cwd: process.cwd(),
-      env: { PATH: process.env.PATH ?? "" },
+      env: { PATH: process.env.PATH ?? "", REA_MCP_TOOL_SURFACE: "full" },
       stderr: "pipe",
     });
     transport.stderr?.on("data", () => undefined);

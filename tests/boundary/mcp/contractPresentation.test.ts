@@ -31,6 +31,7 @@ it("preserves full advertised schemas and handler meaning when presentation orde
       ...process.env,
       REA_MCP_INPUT_SCHEMA_PROFILE: "full",
       REA_MCP_OUTPUT_SCHEMA_PROFILE: "full",
+      REA_MCP_TOOL_SURFACE: "full",
     },
     timeout: 20_000,
     maxBuffer: 16 * 1024 * 1024,

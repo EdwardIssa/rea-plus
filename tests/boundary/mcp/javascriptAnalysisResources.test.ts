@@ -351,6 +351,7 @@ const createResourceClient = ({
     env: {
       PATH: process.env.PATH ?? "",
       NODE_OPTIONS: `--max-old-space-size=${String(parentHeapMb)} --max-semi-space-size=8`,
+      REA_MCP_TOOL_SURFACE: "full",
     },
     stderr: "pipe",
   });

@@ -57,20 +57,33 @@ const connect = async (
 };
 
 it.each([
-  { name: "deferred", environment: {}, eager: false },
+  {
+    name: "deferred",
+    environment: { REA_MCP_TOOL_SURFACE: "full" },
+    eager: false,
+  },
   {
     name: "compact deferred",
-    environment: { REA_MCP_INPUT_SCHEMA_PROFILE: "compact" },
+    environment: {
+      REA_MCP_INPUT_SCHEMA_PROFILE: "compact",
+      REA_MCP_TOOL_SURFACE: "full",
+    },
     eager: false,
   },
   {
     name: "full deferred",
-    environment: { REA_MCP_INPUT_SCHEMA_PROFILE: "full" },
+    environment: {
+      REA_MCP_INPUT_SCHEMA_PROFILE: "full",
+      REA_MCP_TOOL_SURFACE: "full",
+    },
     eager: false,
   },
   {
     name: "output-off eager",
-    environment: { REA_MCP_OUTPUT_SCHEMA_PROFILE: "off" },
+    environment: {
+      REA_MCP_OUTPUT_SCHEMA_PROFILE: "off",
+      REA_MCP_TOOL_SURFACE: "full",
+    },
     eager: true,
   },
 ])(
@@ -151,6 +164,7 @@ it.each([
     );
     const { client, stderr } = await connect(mode, {
       REA_MCP_INPUT_SCHEMA_PROFILE: profile,
+      REA_MCP_TOOL_SURFACE: "full",
     });
     const before = await client.listTools();
     expect(before.tools).toEqual(recorded.tools);
@@ -237,6 +251,7 @@ it.each([
 it("composes a scoped registration instead of serving the recorded catalog", async () => {
   const { client, stderr } = await connect("legacy", {
     REA_MCP_TOOL_FAMILIES: "session",
+    REA_MCP_TOOL_SURFACE: "full",
   });
   const advertised = (await client.listTools()).tools
     .map(({ name }) => name)
@@ -592,7 +607,10 @@ console.log("LATE_PUBLICATION_REFUSED");
   expect(child.stderr).toBe("");
 });
 
-it.each([{}, { REA_MCP_OUTPUT_SCHEMA_PROFILE: "off" }])(
+it.each([
+  { REA_MCP_TOOL_SURFACE: "full" },
+  { REA_MCP_OUTPUT_SCHEMA_PROFILE: "off", REA_MCP_TOOL_SURFACE: "full" },
+])(
   "preserves the configured catalog profile %j",
   async (environment) => {
     const { client } = await connect("legacy", environment);
@@ -622,6 +640,19 @@ it.each([{}, { REA_MCP_OUTPUT_SCHEMA_PROFILE: "off" }])(
 
 it("runs the real static artifact workflow after deferred initialization", async () => {
   const { client } = await connect("legacy");
+  // No surface selection: the connect-time default is the lazy surface,
+  // so the workflow's non-core tools load through discovery first.
+  const advertised = (await client.listTools()).tools.map(({ name }) => name);
+  expect(advertised).toContain("search_tools");
+  expect(advertised).toContain("load_tool_schema");
+  expect(advertised).not.toContain("inspect_artifact");
+  for (const name of ["inspect_artifact", "inspect_analysis_view"]) {
+    const load = await client.callTool({
+      name: "load_tool_schema",
+      arguments: { name },
+    });
+    expect(load.isError, JSON.stringify(load)).not.toBe(true);
+  }
   const opened = await client.callTool({
     name: "open_binary",
     arguments: { path: resolve("scripts/rea.mjs") },

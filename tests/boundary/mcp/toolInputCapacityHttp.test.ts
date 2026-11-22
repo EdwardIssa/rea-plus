@@ -30,6 +30,7 @@ const openHttp = async (
       XDG_DATA_HOME: join(root, "data"),
       NODE_OPTIONS: "--max-old-space-size=3072",
       REA_MCP_OUTPUT_SCHEMA_PROFILE: outputProfile,
+      REA_MCP_TOOL_SURFACE: "full",
       ...(maximum === undefined ? {} : { REA_MCP_MAX_INPUT_ELEMENTS: maximum }),
     },
   );

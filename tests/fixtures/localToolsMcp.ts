@@ -45,6 +45,11 @@ export const localToolsMcpEnvironment = (
   REA_LOG_LEVEL: "silent",
   HOPPER_LAUNCHER_PATH: "/rea-unconfigured-deep-provider/hopper",
   GHIDRA_INSTALL_DIR: process.execPath,
+  // These scenarios call tools directly against the complete catalog, so
+  // the harness selects the full surface; the shipped lazy connect-time
+  // default is exercised by the discovery and deferred-entry suites.
+  // Callers may override the selection through their own environment.
+  REA_MCP_TOOL_SURFACE: "full",
   ...environment,
 });
 

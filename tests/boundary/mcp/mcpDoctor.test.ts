@@ -263,7 +263,13 @@ describe("production MCP doctor", () => {
         command: process.execPath,
         args: [resolve("scripts/rea.mjs"), "mcp"],
         cwd: process.cwd(),
-        environment: { ...process.env, ...environment },
+        // These cases verify the complete catalog's identity through the
+        // production entry, so they select the full surface explicitly.
+        environment: {
+          ...process.env,
+          REA_MCP_TOOL_SURFACE: "full",
+          ...environment,
+        },
       });
 
       expect(result).toMatchObject({
@@ -291,7 +297,11 @@ describe("production MCP doctor", () => {
       expect(result.identity?.observed_catalog_digest).toBe(
         identity.digests.combined_sha256,
       );
-      const selectedEnvironment = { ...process.env, ...environment };
+      const selectedEnvironment = {
+        ...process.env,
+        REA_MCP_TOOL_SURFACE: "full",
+        ...environment,
+      };
       await assertStatusCatalogIdentity(selectedEnvironment, identity);
       if (cliParity)
         await assertCliCatalogIdentity(selectedEnvironment, identity);
@@ -310,6 +320,7 @@ describe("production MCP doctor family scopes", () => {
       const environment = {
         ...process.env,
         REA_MCP_TOOL_FAMILIES: families,
+        REA_MCP_TOOL_SURFACE: "full",
         REA_MCP_INPUT_SCHEMA_PROFILE: "compact",
         REA_MCP_OUTPUT_SCHEMA_PROFILE: output,
       };
@@ -537,7 +548,12 @@ describe("production MCP doctor probe validation", () => {
   it("rejects a schema-invalid probe while retaining the discovered inventory", async () => {
     const root = await createTestTempDirectory("rea-mcp-doctor-reply-");
     const snapshotPath = join(root, "reply.json");
-    const environment = { PATH: process.env.PATH ?? "" };
+    const environment = {
+      PATH: process.env.PATH ?? "",
+      // The captured inventory is the complete catalog the replay checks
+      // retain, so the capture selects the full surface explicitly.
+      REA_MCP_TOOL_SURFACE: "full",
+    };
     const client = new Client({ name: "doctor-reply-capture", version: "1" });
     const transport = new StdioClientTransport({
       command: process.execPath,

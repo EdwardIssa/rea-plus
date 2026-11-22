@@ -211,6 +211,7 @@ it("reports missing sources for a retained dossier with a large link set", async
     new StdioClientTransport({
       command: process.execPath,
       args: [resolve("scripts/rea.mjs"), "mcp"],
+      env: { REA_MCP_TOOL_SURFACE: "full" },
     }),
   );
   const base = FUNCTION_COMPARISON_EXAMPLE.left;

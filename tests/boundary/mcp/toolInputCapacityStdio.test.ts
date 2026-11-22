@@ -21,6 +21,7 @@ it("applies the selected input allowance through the public deferred stdio entry
       NODE_OPTIONS: "--max-old-space-size=3072",
       REA_LOG_LEVEL: "silent",
       REA_MCP_MAX_INPUT_ELEMENTS: "8192",
+      REA_MCP_TOOL_SURFACE: "full",
     },
     stderr: "pipe",
   });

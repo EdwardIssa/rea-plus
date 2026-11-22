@@ -330,7 +330,10 @@ describe("guided prompt catalog identity", () => {
 describe("live server identity over MCP", () => {
   it("exposes live identity, a stable catalog, and changing availability", async () => {
     const session = createTestBinarySession(availabilityProvider());
-    const server = createServer({ kind: "session", session });
+    const server = createServer(
+      { kind: "session", session },
+      { environment: { REA_MCP_TOOL_SURFACE: "full" } },
+    );
     const client = new Client(
       { name: "identity-test", version: "9" },
       {
@@ -374,7 +377,12 @@ describe("live server identity over MCP", () => {
     const session = createTestBinarySession(availabilityProvider());
     const server = createServer(
       { kind: "session", session },
-      { environment: { REA_MCP_INPUT_SCHEMA_PROFILE: "compact" } },
+      {
+        environment: {
+          REA_MCP_INPUT_SCHEMA_PROFILE: "compact",
+          REA_MCP_TOOL_SURFACE: "full",
+        },
+      },
     );
     const client = new Client({ name: "compact-identity-test", version: "1" });
     const [clientTransport, serverTransport] =
@@ -427,7 +435,12 @@ describe("active-target availability over MCP", () => {
     // Availability does not depend on compiling every advertised output schema.
     const server = createServer(
       { kind: "session", session },
-      { environment: { REA_MCP_OUTPUT_SCHEMA_PROFILE: "off" } },
+      {
+        environment: {
+          REA_MCP_OUTPUT_SCHEMA_PROFILE: "off",
+          REA_MCP_TOOL_SURFACE: "full",
+        },
+      },
     );
     const client = new Client({ name: "availability-test", version: "1" });
     const [clientTransport, serverTransport] =

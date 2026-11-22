@@ -28,6 +28,7 @@ workspaceCliTest.for([
         HOME: home,
         REA_LOG_LEVEL: "error",
         REA_MCP_OUTPUT_SCHEMA_PROFILE: profile,
+        REA_MCP_TOOL_SURFACE: "full",
       },
       stderr: "pipe",
     });
