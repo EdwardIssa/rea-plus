@@ -42,8 +42,8 @@ const sha256Of = (path: string): string =>
 /**
  * Pids of s4 escapees alive on the host: processes whose cmdline is the
  * fixture's distinctive different-image invocation (`sleep 31337`). The
- * supervisor's own survivor verification cannot see these (it scans for
- * the target's exe image), so the s4 test checks the host directly.
+ * s4 test checks the host directly as an independent guard, outside the
+ * product's own accounting and verdict entirely.
  */
 const s4EscapeePids = (): number[] => {
   const found: number[] = [];
@@ -99,7 +99,13 @@ describe("execute_dynamically product path", () => {
         hook_pack_version: string;
         frida_version: string;
         pack_ready: { missing: string[] } | null;
-        containment: { breach: boolean; survivors_after: string[] };
+        containment: {
+          verified: boolean;
+          source: string;
+          breach: boolean | null;
+          survivors_after: string[];
+          reaped_descendants: string[];
+        };
       };
     };
     // The class-A truth: the plaintext exists only at runtime.
@@ -114,8 +120,11 @@ describe("execute_dynamically product path", () => {
     expect(nr.execution.frida_version).toBe("17.23.2");
     expect(nr.execution.pack_ready?.missing).toEqual([]);
     expect(nr.execution.containment).toEqual({
+      verified: true,
+      source: "subreaper_accounting",
       breach: false,
       survivors_after: [],
+      reaped_descendants: [],
     });
   }, 120_000);
 
@@ -269,13 +278,25 @@ describe("execute_dynamically containment on the product path", () => {
     ) as Evidence;
     const nr = evidence.normalized_result as {
       execution: {
-        containment: { breach: boolean; survivors_after: string[] };
+        containment: {
+          verified: boolean;
+          source: string;
+          breach: boolean | null;
+          survivors_after: string[];
+          reaped_descendants: string[];
+        };
       };
     };
-    expect(nr.execution.containment).toEqual({
-      breach: false,
-      survivors_after: [],
-    });
+    // Whichever supervisor limit fires, the verdict comes from the
+    // worker's subreaper accounting: the bomb's paused children are the
+    // accounted descendants, all reaped by the verdict, none surviving.
+    expect(nr.execution.containment.verified).toBe(true);
+    expect(nr.execution.containment.source).toBe("subreaper_accounting");
+    expect(nr.execution.containment.breach).toBe(false);
+    expect(nr.execution.containment.survivors_after).toEqual([]);
+    expect(nr.execution.containment.reaped_descendants).toEqual([
+      binaryOf("s1"),
+    ]);
     // The service is healthy for a subsequent run.
     const after = await service.run({
       targetPath: binaryOf("a1"),
@@ -316,13 +337,24 @@ describe("execute_dynamically containment on the product path", () => {
     ) as Evidence;
     const nr = evidence.normalized_result as {
       execution: {
-        containment: { breach: boolean; survivors_after: string[] };
+        containment: {
+          verified: boolean;
+          source: string;
+          breach: boolean | null;
+          survivors_after: string[];
+          reaped_descendants: string[];
+        };
       };
       output: { stdout: string };
     };
     expect(nr.execution.containment).toEqual({
+      verified: true,
+      source: "subreaper_accounting",
       breach: false,
       survivors_after: [],
+      // The escapee pauses in the target's own image; the subreaper
+      // accounting names it as a reaped descendant.
+      reaped_descendants: [binaryOf("s3")],
     });
     expect(nr.output.stdout).toContain("escapee-spawned");
   }, 180_000);
@@ -344,24 +376,35 @@ describe("execute_dynamically containment on the product path", () => {
     ) as Evidence;
     const nr = evidence.normalized_result as {
       execution: {
-        containment: { breach: boolean; survivors_after: string[] };
+        containment: {
+          verified: boolean;
+          source: string;
+          breach: boolean | null;
+          survivors_after: string[];
+          reaped_descendants: string[];
+        };
       };
       output: { stdout: string };
     };
-    expect(nr.execution.containment).toEqual({
-      breach: false,
-      survivors_after: [],
-    });
+    expect(nr.execution.containment.verified).toBe(true);
+    expect(nr.execution.containment.source).toBe("subreaper_accounting");
+    expect(nr.execution.containment.breach).toBe(false);
+    expect(nr.execution.containment.survivors_after).toEqual([]);
+    // The verdict is sourced from the worker's subreaper accounting, and
+    // the accounting names the reaped escapee by the image it exec'd —
+    // the fact a target-exe scan could never produce for this fixture.
+    expect(
+      nr.execution.containment.reaped_descendants.some((exe) =>
+        exe.endsWith("/sleep"),
+      ),
+    ).toBe(true);
     expect(nr.output.stdout).toContain("escapee-spawned");
-    // The Evidence containment check scans only for processes running
-    // the target's own exe image; an escapee that exec'd a different
-    // image (/bin/sleep) is invisible to it. Verify independently at
-    // the host level: the fixture's escapee runs /bin/sleep with a
-    // distinctive duration, so scan /proc cmdlines for exactly that
-    // invocation. This is the assertion that makes the subreaper
-    // load-bearing: with the shim dropped from the chain, the orphaned
-    // escapee reparents to the host init instead of the worker, no
-    // cascade layer can see it, and this scan finds it alive.
+    // Verify independently at the host level: the fixture's escapee runs
+    // /bin/sleep with a distinctive duration, so scan /proc cmdlines for
+    // exactly that invocation. This is the assertion that makes the
+    // subreaper load-bearing: with the shim dropped from the chain, the
+    // orphaned escapee reparents to the host init instead of the worker,
+    // no cascade layer can see it, and this scan finds it alive.
     const escapees = s4EscapeePids();
     try {
       expect(escapees).toEqual([]);

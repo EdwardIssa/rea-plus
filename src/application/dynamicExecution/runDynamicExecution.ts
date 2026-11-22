@@ -36,6 +36,10 @@ import {
   resolveDynamicExecutionBudgets,
   type DynamicExecutionRunOutcome,
 } from "../../domain/dynamicExecution/dynamicExecutionReport.js";
+import {
+  composeContainmentVerdict,
+  containmentAccountingTruncated,
+} from "../../domain/dynamicExecution/containmentVerdict.js";
 import { err, ok, type Result } from "../../domain/result.js";
 import {
   fridaProviderState,
@@ -321,8 +325,6 @@ export const createDynamicExecutionService = (): DynamicExecutionService => {
       const stdoutFd = openSync(join(runDir, "chain-stdout.log"), "w");
       const stderrFd = openSync(join(runDir, "chain-stderr.log"), "w");
       let outcome: Awaited<ReturnType<WorkerSupervisor["outcome"]>>;
-      let survivorsAfter: string[] = [];
-      let breach = false;
       try {
         const child = spawn(
           "unshare",
@@ -366,18 +368,6 @@ export const createDynamicExecutionService = (): DynamicExecutionService => {
         } finally {
           signal?.removeEventListener("abort", onAbort);
         }
-        // Settle, then verify: no process running the target binary may
-        // survive. A survivor is a containment breach and is reported.
-        await sleep(600);
-        let survivors = processesWithExe([program]);
-        breach = survivors.length > 0;
-        if (breach) {
-          for (const pid of survivors) killPid(pid);
-          await sleep(400);
-          survivors = processesWithExe([program]);
-          for (const pid of survivors) killPid(pid);
-        }
-        survivorsAfter = survivors.map(exeOf);
       } finally {
         closeSync(stdoutFd);
         closeSync(stderrFd);
@@ -436,6 +426,37 @@ export const createDynamicExecutionService = (): DynamicExecutionService => {
         );
       bindingAvailable = true;
 
+      // Containment verdict, sourced from the worker's subreaper
+      // descendant accounting: the worker is the process every escapee
+      // reparented to, so its accounting covers descendants whatever
+      // image they exec'd, where a scan for the target's own exe image is
+      // structurally blind. Settle, then verify the accounting's
+      // remaining set against /proc (same pid, same exe image); a
+      // target-image sweep runs alongside only as a falsifier, able to
+      // add a survivor, never to clear one. Survivors found either way
+      // are killed as cleanup, and the verdict records that they survived
+      // the termination cascade. With no armed accounting the verdict is
+      // unverified: the Evidence claims neither breach nor clean.
+      await sleep(600);
+      const accounting = workerResult.descendant_accounting;
+      const aliveAccounted = (accounting?.remaining ?? []).filter(
+        (entry) => exeOf(entry.pid) === entry.exe,
+      );
+      let sweepPids = processesWithExe([program]);
+      const sweepSurvivors = sweepPids.map(exeOf);
+      const containment = composeContainmentVerdict({
+        accounting,
+        aliveAccounted,
+        sweepSurvivors,
+      });
+      for (const entry of aliveAccounted) killPid(entry.pid);
+      if (sweepPids.length > 0) {
+        for (const pid of sweepPids) killPid(pid);
+        await sleep(400);
+        sweepPids = processesWithExe([program]);
+        for (const pid of sweepPids) killPid(pid);
+      }
+
       const filing = fileDynamicObservations(workerResult.messages);
       const limitations: string[] = [];
       const missing = filing.packReady?.missing ?? [];
@@ -450,9 +471,20 @@ export const createDynamicExecutionService = (): DynamicExecutionService => {
       if (workerResult.status === "session_timeout")
         limitations.push("run_terminated: session_timeout");
       if (!workerResult.stream_settled) limitations.push("stdout_incomplete");
-      if (breach)
+      if (!containment.verified)
         limitations.push(
-          `containment_breach: target processes survived the termination cascade: ${survivorsAfter.join(", ")}`,
+          "containment_unverified: subreaper descendant accounting unavailable for this run; containment was not verified",
+        );
+      else if (
+        accounting !== null &&
+        containmentAccountingTruncated(accounting)
+      )
+        limitations.push(
+          "containment_accounting_truncated: descendant accounting lists were capped; the recorded counts carry the full totals",
+        );
+      if (containment.breach === true)
+        limitations.push(
+          `containment_breach: processes survived the termination cascade: ${containment.survivors_after.join(", ")}`,
         );
       const status: DynamicExecutionRunOutcome["status"] =
         workerResult.status === "complete" && outcome.reason === "exited"
@@ -485,7 +517,7 @@ export const createDynamicExecutionService = (): DynamicExecutionService => {
             deadline_ms: budgets.deadlineMs,
             rss_cap_bytes: budgets.rssCapBytes,
           },
-          containment: { survivors_after: survivorsAfter, breach },
+          containment,
         },
       };
       const evidence = createEvidence(
