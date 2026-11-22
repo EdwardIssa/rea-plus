@@ -154,3 +154,125 @@ it("resolves cross-shard RPC endpoints to whole-file parity", async () => {
   const resolved = resolveCrossShardRpcEndpoints(merged);
   expect(rpcEndpoints([...merged.endpoints, ...resolved])).toEqual(expected);
 });
+
+// Object-form dependency maps: Metro emits `__d(factory, id, {"0": 200,
+// "paths": {}})` instead of an array for sparse maps. The requested module
+// of a `_r(_deps[0])` binding must still resolve through the map's numeric
+// keys so namespace and destructured candidates reach whole-file parity.
+const objectFormBundle = [
+  `__d(function (global, _r, _importDefault, _importAll, _module, _exports, _deps) {
+     _exports.supabase = createClient("https://example.supabase.co", "anon-key");
+   }, 200, []);`,
+  `__d(function (global, _r, _importDefault, _importAll, _module, _exports, _deps) {
+     var _ns = _r(_deps[0]);
+     _exports.load = function () {
+       return _ns.supabase.rpc("object_form_rpc", {});
+     };
+   }, 201, {"0": 200, "paths": {}});`,
+  `__d(function (global, _r, _importDefault, _importAll, _module, _exports, _deps) {
+     var { supabase } = _r(_deps[0]);
+     _exports.issue = function () {
+       return supabase.rpc("object_form_destructured", {});
+     };
+   }, 202, {"0": 200, "paths": {}});`,
+  ...[203, 204, 205, 206, 207].map(
+    (key) =>
+      `__d(function (global, _r, _importDefault, _importAll, _module, _exports, _deps) {
+         _exports.filler${String(key)} = ${String(key)};
+       }, ${String(key)}, []);`,
+  ),
+  `__r(201);`,
+].join("\n");
+
+it("resolves object-form dependency maps to whole-file parity", async () => {
+  const whole = analyzeJavaScriptStaticSource(objectFormBundle);
+  const expected = rpcEndpoints(whole.endpoints);
+  expect(expected).toEqual([
+    "object_form_destructured|candidate|202",
+    "object_form_rpc|candidate|201",
+  ]);
+  const merged = await shardedStaticFacts(objectFormBundle);
+  expect(rpcEndpoints(merged.endpoints)).toEqual([]);
+  const candidates = new Map(
+    (merged.rpc_candidates ?? []).map((candidate) => [
+      candidate.value,
+      candidate.requested_module_key,
+    ]),
+  );
+  expect(candidates.get("object_form_rpc")).toBe("200");
+  expect(candidates.get("object_form_destructured")).toBe("200");
+  const resolved = resolveCrossShardRpcEndpoints(merged);
+  expect(rpcEndpoints([...merged.endpoints, ...resolved])).toEqual(expected);
+});
+
+// A repeated index key in an object-form map resolves to its last
+// property, as in object evaluation: the first key names a module that
+// publishes nothing, the last names the client module.
+const repeatedKeyBundle = [
+  `__d(function (global, _r, _importDefault, _importAll, _module, _exports, _deps) {
+     _exports.supabase = createClient("https://example.supabase.co", "anon-key");
+   }, 200, []);`,
+  `__d(function (global, _r, _importDefault, _importAll, _module, _exports, _deps) {
+     var _ns = _r(_deps[0]);
+     _exports.load = function () {
+       return _ns.supabase.rpc("object_form_repeated_key", {});
+     };
+   }, 201, {"0": 999, "0": 200, "paths": {}});`,
+  ...[202, 203, 204, 205, 206, 207].map(
+    (key) =>
+      `__d(function (global, _r, _importDefault, _importAll, _module, _exports, _deps) {
+         _exports.filler${String(key)} = ${String(key)};
+       }, ${String(key)}, []);`,
+  ),
+  `__r(201);`,
+].join("\n");
+
+it("resolves a repeated object-form dependency key to its last value", async () => {
+  const merged = await shardedStaticFacts(repeatedKeyBundle);
+  const candidate = (merged.rpc_candidates ?? []).find(
+    ({ value }) => value === "object_form_repeated_key",
+  );
+  expect(candidate?.requested_module_key).toBe("200");
+  const resolved = resolveCrossShardRpcEndpoints(merged);
+  expect(rpcEndpoints(resolved)).toEqual([
+    "object_form_repeated_key|candidate|201",
+  ]);
+});
+
+// An object-form map that lacks the index a require call uses leaves the
+// requested module unproven: the candidate is retained with a null key and
+// the join emits nothing. Whole-file analysis still surfaces the call —
+// it classifies the receiver from the member name without consulting the
+// map — so this divergence is the join's conservative boundary, pinned
+// here rather than treated as a defect.
+const missingIndexBundle = [
+  `__d(function (global, _r, _importDefault, _importAll, _module, _exports, _deps) {
+     _exports.supabase = createClient("https://example.supabase.co", "anon-key");
+   }, 200, []);`,
+  `__d(function (global, _r, _importDefault, _importAll, _module, _exports, _deps) {
+     var _ns = _r(_deps[0]);
+     _exports.load = function () {
+       return _ns.supabase.rpc("object_form_missing_index", {});
+     };
+   }, 201, {"1": 200, "paths": {}});`,
+  ...[202, 203, 204, 205, 206, 207].map(
+    (key) =>
+      `__d(function (global, _r, _importDefault, _importAll, _module, _exports, _deps) {
+         _exports.filler${String(key)} = ${String(key)};
+       }, ${String(key)}, []);`,
+  ),
+  `__r(201);`,
+].join("\n");
+
+it("leaves an object-form candidate unresolved when its index is absent", async () => {
+  const whole = analyzeJavaScriptStaticSource(missingIndexBundle);
+  expect(rpcEndpoints(whole.endpoints)).toEqual([
+    "object_form_missing_index|candidate|201",
+  ]);
+  const merged = await shardedStaticFacts(missingIndexBundle);
+  const candidate = (merged.rpc_candidates ?? []).find(
+    ({ value }) => value === "object_form_missing_index",
+  );
+  expect(candidate?.requested_module_key).toBeNull();
+  expect(rpcEndpoints(resolveCrossShardRpcEndpoints(merged))).toEqual([]);
+});
