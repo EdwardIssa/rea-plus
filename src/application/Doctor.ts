@@ -102,6 +102,13 @@ export interface DoctorProviderInspection {
   readonly id: string;
   readonly configured: boolean;
   readonly available: boolean;
+  /**
+   * Three-state readiness projection for providers that distinguish an
+   * absent engine from one that is installed and ready. Providers without
+   * the projection omit the field; the binary `available` fact stays
+   * authoritative for them.
+   */
+  readonly state?: "absent" | "loading" | "ready";
   readonly providerVersion: string | null;
   /** Validated discoveries used as registration defaults. Setup preserves
    * caller-selected configuration separately from these readiness facts. */

@@ -11,6 +11,7 @@ import {
   type GhidraInstallationCheck,
   type GhidraInstallationInspection,
 } from "./GhidraInstallation.js";
+import { ghidraProviderState } from "./GhidraProviderState.js";
 import {
   GHIDRA_RESTRICTED_TEMP_REMEDIATION,
   probeGhidraTemporaryDirectory,
@@ -28,13 +29,20 @@ export const projectGhidraDoctorInspection = (
       : undefined;
   const windowsAuthorityUnavailable = readiness?.available === false;
   const temporaryDirectoryUnavailable = temporaryDirectory?.ok === false;
+  const available =
+    inspection.status === "available" &&
+    !windowsAuthorityUnavailable &&
+    !temporaryDirectoryUnavailable;
   return {
     id: "ghidra",
     configured: inspection.installDir !== null,
-    available:
-      inspection.status === "available" &&
-      !windowsAuthorityUnavailable &&
-      !temporaryDirectoryUnavailable,
+    available,
+    // The doctor has no live session, so the state is ready or absent;
+    // `loading` is projected at the session layer while a worker runs.
+    state: ghidraProviderState({
+      installationAvailable: available,
+      activity: "none",
+    }),
     providerVersion: inspection.providerVersion,
     registrationEnvironment:
       inspection.status === "available"
