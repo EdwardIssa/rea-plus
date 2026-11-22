@@ -2,7 +2,7 @@
 ---
 
 
-## [6.9.0](https://github.com/EdwardIssa/rea-plus/compare/rea-agents-6.8.0...rea-agents-6.9.0) (2026-11-20)
+## [6.9.0](https://github.com/EdwardIssa/rea-plus/compare/rea-agents-6.8.0...rea-agents-6.9.0) (2026-11-22)
 
 
 ### ⚠ BREAKING CHANGES
@@ -568,6 +568,7 @@
 * **javascript:** resolve module-level Electron options in functions ([#8960](https://github.com/EdwardIssa/rea-plus/issues/8960)) ([a2134b3](https://github.com/EdwardIssa/rea-plus/commit/a2134b3a74f335cdabd99582ee2dda4ddc336070))
 * **javascript:** resolve preceding exported variable initializers and computed method keys ([#5387](https://github.com/EdwardIssa/rea-plus/issues/5387)) ([cbeeeda](https://github.com/EdwardIssa/rea-plus/commit/cbeeeda97b33c1ea7e00890b17b9b5870389043f))
 * **javascript:** resolve relative ESM backslash paths ([#4323](https://github.com/EdwardIssa/rea-plus/issues/4323)) ([1903220](https://github.com/EdwardIssa/rea-plus/commit/19032204aacde0f6d36b2f55006bd0e51a43d54c))
+* **javascript:** resolve requested modules through object-form Metro dependency maps ([30d3ff8](https://github.com/EdwardIssa/rea-plus/commit/30d3ff8559aa6ee30802e005c72c8529d8fce9e2))
 * **javascript:** resolve variable initializers before computed method keys ([cbeeeda](https://github.com/EdwardIssa/rea-plus/commit/cbeeeda97b33c1ea7e00890b17b9b5870389043f))
 * **javascript:** resolve Vite build-output preload dependencies ([#7745](https://github.com/EdwardIssa/rea-plus/issues/7745)) ([7aa943c](https://github.com/EdwardIssa/rea-plus/commit/7aa943c14bea11f4ab0c8ca8cfe60f6bb462ebdd))
 * **javascript:** retain anchored route constants under reserved prefixes ([#7838](https://github.com/EdwardIssa/rea-plus/issues/7838)) ([9b7c2bb](https://github.com/EdwardIssa/rea-plus/commit/9b7c2bb1ac00273469adf0021017fa7b9563dd8d))
@@ -1164,6 +1165,7 @@
 * **hopper:** verify bootstrap cleanup ownership ([c79bd41](https://github.com/EdwardIssa/rea-plus/commit/c79bd41b5d6d65b7b2a9b6e0b58d376fc36910d6))
 * **javascript:** cover Request endpoint identity and provenance ([#6365](https://github.com/EdwardIssa/rea-plus/issues/6365)) ([09c889b](https://github.com/EdwardIssa/rea-plus/commit/09c889b3b5c6df26c47565cc1b8fcad8864c8710))
 * **javascript:** cross-shard RPC join matrix and sharded parity fixture ([b5e8c76](https://github.com/EdwardIssa/rea-plus/commit/b5e8c765da046c972d7bb4eee0a751cce4be6782))
+* **javascript:** object-form dependency map parity fixtures ([c9adb67](https://github.com/EdwardIssa/rea-plus/commit/c9adb6759733624c7fe529b5cbb6c9e37d564201))
 * **javascript:** pin parent result-budget truncation markers and resume cursor ([8cf3c09](https://github.com/EdwardIssa/rea-plus/commit/8cf3c097c1c9ef57a3ffbf760972d20669584344))
 * **mcp:** bound schema compilation for native and web workflows ([6be6596](https://github.com/EdwardIssa/rea-plus/commit/6be6596aaca5a9f584fd726b9ca7733d5b54f55a))
 * **mcp:** validate selected tools without compiling the entire catalog ([cc5a969](https://github.com/EdwardIssa/rea-plus/commit/cc5a96933aaae4738289c349c8720037c7b45590))
