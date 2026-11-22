@@ -49,6 +49,59 @@ export type DynamicSupervisorOutcome = z.infer<
   typeof dynamicSupervisorOutcomeSchema
 >;
 
+/** One process in the subreaper worker's descendant accounting. */
+export const dynamicAccountedProcessSchema = z.strictObject({
+  pid: z.int().min(0),
+  exe: z.string().min(1),
+});
+export type DynamicAccountedProcess = z.infer<
+  typeof dynamicAccountedProcessSchema
+>;
+
+/**
+ * Descendant accounting kept by the dynamic worker in its subreaper role:
+ * every process that reparented to the worker (an escapee's only path) is
+ * visible here regardless of the image it exec'd, which is what makes this
+ * accounting authoritative for the containment verdict where a scan for
+ * the target's own exe image is structurally blind. `observed` is the
+ * union of descendants recorded from the moment the session ended
+ * (bounded; the count carries the true total), `remaining` is the set
+ * present at the most recent accounting refresh — refreshes also run
+ * during the session, so a worker ended mid-session still leaves a
+ * current remaining set behind. The target process itself is never
+ * accounted: it is the session's own process, not a descendant escapee.
+ * Null on a worker result means no accounting was ever taken (the worker
+ * was ended before its first refresh, or a build without accounting
+ * published the snapshot): the containment verdict for such a run is
+ * unverified, never clean.
+ */
+export const dynamicDescendantAccountingSchema = z.strictObject({
+  /** True when the shim's marker proves this worker holds the subreaper role. */
+  subreaper_armed: z.boolean(),
+  observed: z.array(dynamicAccountedProcessSchema),
+  observed_count: z.int().min(0),
+  remaining: z.array(dynamicAccountedProcessSchema),
+  remaining_count: z.int().min(0),
+});
+export type DynamicDescendantAccounting = z.infer<
+  typeof dynamicDescendantAccountingSchema
+>;
+
+/**
+ * The containment verdict written into Evidence. Sourced from the
+ * subreaper descendant accounting (see composeContainmentVerdict): when
+ * no armed accounting exists, `verified` is false and `breach` is null —
+ * an unmeasured verdict is never written as a clean one.
+ */
+export const dynamicContainmentSchema = z.strictObject({
+  verified: z.boolean(),
+  source: z.enum(["subreaper_accounting", "unavailable"]),
+  survivors_after: z.array(z.string()),
+  breach: z.boolean().nullable(),
+  reaped_descendants: z.array(z.string()),
+});
+export type DynamicContainment = z.infer<typeof dynamicContainmentSchema>;
+
 export const dynamicExecutionBlockSchema = z.strictObject({
   hook_pack_version: z.string().min(1),
   frida_version: z.string().min(1),
@@ -66,10 +119,7 @@ export const dynamicExecutionBlockSchema = z.strictObject({
     deadline_ms: z.int().min(0),
     rss_cap_bytes: z.int().min(0),
   }),
-  containment: z.strictObject({
-    survivors_after: z.array(z.string()),
-    breach: z.boolean(),
-  }),
+  containment: dynamicContainmentSchema,
 });
 export type DynamicExecutionBlock = z.infer<typeof dynamicExecutionBlockSchema>;
 
@@ -111,6 +161,11 @@ export const dynamicWorkerResultSchema = z.strictObject({
   stream_settled: z.boolean(),
   messages: z.array(jsonValueSchema),
   messages_truncated: z.boolean(),
+  /**
+   * The worker's subreaper descendant accounting, refreshed from the
+   * moment the session ends; null until the first accounting is taken.
+   */
+  descendant_accounting: dynamicDescendantAccountingSchema.nullable(),
 });
 export type DynamicWorkerResult = z.infer<typeof dynamicWorkerResultSchema>;
 

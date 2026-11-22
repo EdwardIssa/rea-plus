@@ -14,6 +14,7 @@
 import {
   existsSync,
   readFileSync,
+  readlinkSync,
   readdirSync,
   renameSync,
   writeFileSync,
@@ -23,6 +24,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   dynamicWorkerResultSchema,
+  type DynamicAccountedProcess,
   type DynamicWorkerResult,
 } from "../domain/dynamicExecution/dynamicObservation.js";
 import type { JsonValue } from "../domain/jsonValue.js";
@@ -32,6 +34,7 @@ import {
   HOOK_PACK_TESTED_FRIDA_MAJOR,
   HOOK_PACK_VERSION,
 } from "./hookPack.js";
+import { SUBREAPER_MARKER_FILE } from "./subreaperShim.js";
 
 const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
@@ -64,6 +67,18 @@ const descendantsOf = (rootPid: number): number[] => {
   }
   return found;
 };
+
+/** Exe image of a live pid; null when it exited mid-scan or is a zombie. */
+const exeOfPid = (pid: number): string | null => {
+  try {
+    return readlinkSync(`/proc/${pid}/exe`);
+  } catch {
+    return null;
+  }
+};
+
+/** Stored accounting lists are bounded; the counts carry the true totals. */
+const ACCOUNTING_LIST_CAP = 4096;
 
 interface DynamicJob {
   readonly program: string;
@@ -135,12 +150,70 @@ const main = async (): Promise<void> => {
     stream_settled: false,
     messages: [],
     messages_truncated: false,
+    descendant_accounting: null,
   };
   const publish = (): void => {
     const parsed = dynamicWorkerResultSchema.parse(result);
     const temp = `${job.result_path}.tmp-${process.pid}`;
     writeFileSync(temp, `${JSON.stringify(parsed, null, 1)}\n`);
     renameSync(temp, job.result_path);
+  };
+  // The shim that armed this worker as the run's subreaper left a marker
+  // beside the job naming its own pid, which the exec preserved into this
+  // process. Only with that proof is this worker's descendant accounting
+  // authoritative: without it, escapees reparent past this worker to the
+  // host init, the accounting would be blind, and the application must
+  // claim no containment verdict from it.
+  let subreaperArmed = false;
+  try {
+    const marker = JSON.parse(
+      readFileSync(
+        join(dirname(job.result_path), SUBREAPER_MARKER_FILE),
+        "utf8",
+      ),
+    ) as { pid?: unknown; subreaper?: unknown };
+    subreaperArmed = marker.subreaper === true && marker.pid === process.pid;
+  } catch {
+    subreaperArmed = false;
+  }
+  const observedDescendants = new Map<number, string>();
+  /**
+   * Refresh the descendant accounting from the worker's own tree and
+   * return the descendants remaining now. As the subreaper this worker
+   * is where escapees reparent, so its tree is the complete descendant
+   * set for the run regardless of the image a descendant exec'd. The
+   * target itself is excluded: it is the session's own process, not an
+   * escapee. Processes whose exe can no longer be read (exited mid-scan,
+   * zombie husks) are not remaining. The observed union is recorded only
+   * once the session has ended (recordObserved), when a surviving
+   * descendant has by definition outlived the target; the remaining set
+   * refreshes during the session too, so a worker ended mid-session by
+   * the supervisor still leaves a current set for the verdict.
+   */
+  const refreshAccounting = (
+    recordObserved: boolean,
+  ): readonly DynamicAccountedProcess[] => {
+    const current: DynamicAccountedProcess[] = [];
+    for (const pid of descendantsOf(process.pid)) {
+      if (pid === result.target_pid) continue;
+      const exe = exeOfPid(pid);
+      if (exe === null) continue;
+      current.push({ pid, exe });
+      if (recordObserved && !observedDescendants.has(pid))
+        observedDescendants.set(pid, exe);
+    }
+    const observed = [...observedDescendants.entries()].map(([pid, exe]) => ({
+      pid,
+      exe,
+    }));
+    result.descendant_accounting = {
+      subreaper_armed: subreaperArmed,
+      observed: observed.slice(0, ACCOUNTING_LIST_CAP),
+      observed_count: observed.length,
+      remaining: current.slice(0, ACCOUNTING_LIST_CAP),
+      remaining_count: current.length,
+    };
+    return current;
   };
   try {
     process.chdir(job.cwd);
@@ -208,6 +281,7 @@ const main = async (): Promise<void> => {
     let longest: readonly JsonValue[] = [];
     let detached = false;
     let lastPublishAt = Date.now();
+    let lastAccountingAt = 0;
     const deadline = Date.now() + job.session_timeout_ms;
     while (Date.now() < deadline) {
       const status = provider.status(sessionId);
@@ -231,6 +305,20 @@ const main = async (): Promise<void> => {
         result.messages = [...longest];
         publish();
         lastPublishAt = Date.now();
+      }
+      // Keep the accounting's remaining set current while the session
+      // runs, so a worker the supervisor ends mid-session (deadline, RSS
+      // cap) still leaves a fresh set for the containment verdict.
+      if (Date.now() - lastAccountingAt >= 250) {
+        lastAccountingAt = Date.now();
+        const before = result.descendant_accounting;
+        refreshAccounting(false);
+        const after = result.descendant_accounting;
+        if (
+          before?.remaining_count !== after?.remaining_count ||
+          before?.observed_count !== after?.observed_count
+        )
+          publish();
       }
       await sleep(50);
     }
@@ -276,24 +364,35 @@ const main = async (): Promise<void> => {
       result.status = "complete";
       publish();
     }
-    // Survivor check: processes still in the worker's own tree (escapees
-    // reparent here through the subreaper) are held inside the
-    // supervisor's accounting until it ends the run; the worker never
-    // releases them into the host. If they drain on their own, the run
-    // completes normally.
+    // Survivor check and descendant accounting: processes still in the
+    // worker's own tree (escapees reparent here through the subreaper)
+    // are held inside the supervisor's accounting until it ends the run;
+    // the worker never releases them into the host. If they drain on
+    // their own, the run completes normally. The accounting is refreshed
+    // and re-published whenever the held set changes, so a run the
+    // supervisor ends mid-hold still leaves its latest accounting in the
+    // published result for the application's containment verdict.
     await sleep(150);
-    if (descendantsOf(process.pid).length > 0) {
+    let remaining = refreshAccounting(true);
+    publish();
+    if (remaining.length > 0) {
       if (result.status === "complete") {
         result.status = "holding";
         publish();
       }
       const holdDeadline = Date.now() + 600_000;
-      while (Date.now() < holdDeadline && descendantsOf(process.pid).length > 0)
+      while (Date.now() < holdDeadline && remaining.length > 0) {
         await sleep(500);
-      if (
-        descendantsOf(process.pid).length === 0 &&
-        result.status === "holding"
-      ) {
+        const before = result.descendant_accounting;
+        remaining = refreshAccounting(true);
+        const after = result.descendant_accounting;
+        if (
+          before?.remaining_count !== after?.remaining_count ||
+          before?.observed_count !== after?.observed_count
+        )
+          publish();
+      }
+      if (remaining.length === 0 && result.status === "holding") {
         result.status = "complete";
         publish();
       }
