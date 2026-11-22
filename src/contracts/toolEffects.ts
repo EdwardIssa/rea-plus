@@ -54,6 +54,7 @@ const browserEvidence = effects({
 export const TOOL_EFFECTS: Readonly<Record<string, ToolEffects>> = {
   inspect_analysis_settings: effects(),
   update_analysis_settings: effects({ mutatesSession: true }),
+  adjudicate_string_claims: effects({ writesFilesystem: true }),
   list_cutter_sessions: effects({ accessesNetwork: true }),
   cutter_command: effects({
     mutatesTarget: true,

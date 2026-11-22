@@ -10,6 +10,7 @@ import {
   exportEvidenceBundleCommand,
   importEvidenceBundleCommand,
 } from "./application/EvidenceBundleCommands.js";
+import { runClaimCheckCommand } from "./application/claimCheck/runClaimCheck.js";
 import { logCliCommand } from "./cliLogging.js";
 import type { Logger } from "pino";
 import { CLI_COMMANDS } from "./cliCommandNames.js";
@@ -57,6 +58,35 @@ export const registerEvidenceCommands = (
             signal,
           );
           return exported.ok ? exported.value : cliError(exported.error);
+        }),
+      ),
+  });
+  cli.command(CLI_COMMANDS.claimCheck, {
+    description:
+      "Adjudicate native string claims from list_strings/search_strings Evidence against the artifact's own bytes; writes a hash-chained claim-check ledger",
+    args: z.object({
+      evidence: localPathStringSchema.describe(
+        "Evidence JSON path (one record or an array of records)",
+      ),
+      artifact: localPathStringSchema.describe(
+        "Local artifact the Evidence describes",
+      ),
+      ledger: localPathStringSchema.describe(
+        "Claim-check ledger JSON output path",
+      ),
+    }),
+    run: ({ args }) =>
+      withCommandCancellation((signal) =>
+        logCliCommand(logger, "claim-check", async () => {
+          const ran = await runClaimCheckCommand(
+            {
+              evidencePath: args.evidence,
+              artifactPath: args.artifact,
+              ledgerPath: args.ledger,
+            },
+            signal,
+          );
+          return ran.ok ? ran.value : cliError(ran.error);
         }),
       ),
   });

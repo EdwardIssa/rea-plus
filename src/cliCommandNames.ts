@@ -144,6 +144,7 @@ export const CLI_COMMANDS = Object.freeze({
   demangleSwift: "demangle-swift",
   evidenceImport: "evidence-import",
   evidenceExport: "evidence-export",
+  claimCheck: "claim-check",
   environmentServe: "environment-serve",
   environmentExport: "environment-export",
   environmentCompare: "environment-compare",

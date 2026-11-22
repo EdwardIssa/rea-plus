@@ -7,6 +7,7 @@ import { SCOPED_NO_TARGET_RECOVERY } from "./recoveryInstructions.js";
 import { AnalysisSettings } from "../application/AnalysisSettings.js";
 import { parseMcpInputBudget } from "../config/mcpInputBudget.js";
 import { registerAnalysisSettingsTools } from "./registerAnalysisSettingsTools.js";
+import { registerClaimCheckTool } from "./registerClaimCheckTool.js";
 import { registerDevicetreeTool } from "./registerDevicetreeTool.js";
 import { registerGpuCodeObjectsTools } from "./registerGpuCodeObjectsTools.js";
 import { serverInstructions } from "./serverInstructions.js";
@@ -165,7 +166,8 @@ const createMcpServer = (
 };
 
 /** Bind surface tools through the server's canonical registration. */
-const surfaceToolBinder = (server: EvidenceMcpServer): SurfaceToolBinder =>
+const surfaceToolBinder =
+  (server: EvidenceMcpServer): SurfaceToolBinder =>
   (name, config, callback) => {
     server.registerTool(name, config as never, callback as never);
   };
@@ -771,6 +773,7 @@ export const createServer = (
       }),
     application: () => {
       registerAnalysisSettingsTools(server, analysisSettings);
+      registerClaimCheckTool(server);
       registerAnalysisViewTool(
         server,
         toolLogger,
