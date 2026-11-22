@@ -134,6 +134,41 @@ the `write` hook after queueing the message; a 9-session spot check over
 previously failing stimuli then reproduced truth stdout 9/9. The pack
 version is recorded in every run record, as before.
 
+## EXTEND follow-up vocabulary (2026-11-22, separate pre-registration)
+
+Run 1 above stands as measured under the original filing rules; its
+verdict was EXTEND (dynamic FP 9.7%, in the 5–10% band). The follow-up
+re-measurement is pre-registered separately in
+`hidden_files/ablation-extend-preregistration.md` and changes ONLY the
+filing vocabulary: every observation is filed under exactly one item
+kind, determined by what the observation is and by the channel that
+observed it. Run 1's rules filed a dlopen path as both `module:` and
+`string:`, a dlsym name as both `symbol:` and `string:`, and stdout
+lines as string claims on top of the output claim (10 of run 1's 17
+dynamic false claims are this double filing).
+
+Follow-up filing rules (implemented in `scripts/ablation/claims.mjs`):
+
+- **Arm S**: one filing per string fact, by precedence — (1) module
+  derivation (basename matches the `.so` pattern, contains no `%`, is
+  not a `DT_NEEDED` entry, is not the interpreter basename) → `module:`
+  only; (2) symbol derivation (identifier-shaped, length ≥ 4, binary
+  imports `dlsym`, not an accounted name) → `symbol:` only; (3) the
+  content-string triage above → `string:`. A basename containing `%` is
+  an unexpanded format template, not a loadable module name: B3's
+  `./lib%s%s.so` pair collapses to the string filing alone.
+- **Arm D**: a successful `dlopen` observation files `module:` only; a
+  successful `dlsym` observation files `symbol:` only; the stdout
+  stream files as the `output` claim only (its lines are not re-filed
+  as strings). Dynamic string claims come only from the output-function
+  argument channel (`puts`/`fputs` arguments, printf-family format
+  arguments). `MARK:` attribution, candidate edges, and outputs are
+  unchanged.
+
+Corpus, ground truth, budgets, repetitions, hook pack (1.1.0), and the
+scoring math are unchanged. The follow-up's decision bands are in its
+pre-registration, not in the spec's §5 rule.
+
 ## Known authored noise (declared in advance)
 
 - A4's stored base64 text is a content string and will be a static false

@@ -7,6 +7,15 @@
  * A claim set is { items: Set<string>, outputs: Map<stimulusId, string> }.
  * Item keys: string:<v> | module:<v> | symbol:<v> | function:<n>@<s> |
  * edge:<c>><f>@<s>. Outputs are claimed verbatim per stimulus.
+ *
+ * Filing vocabulary (EXTEND follow-up, pre-registered in
+ * hidden_files/ablation-extend-preregistration.md; SCORING.md records the
+ * follow-up rules): every observation is filed under exactly one item
+ * kind, determined by what the observation is and by the channel that
+ * observed it. A dlopen path is a module observation only, a dlsym name a
+ * symbol observation only, the stdout stream an output observation only;
+ * dynamic string claims come only from output-function argument captures.
+ * Run 1's rules filed each of those observations under two kinds.
  */
 
 export const stringItem = (v) => `string:${v}`;
@@ -69,22 +78,33 @@ export const staticClaims = (facts) => {
     ...facts.dtNeeded,
     ...(facts.commentStrings ?? []),
   ]);
+  // One filing per fact, by precedence: module derivation, then symbol
+  // derivation, then the content-string filing. The two derivations are
+  // mutually exclusive (a .so basename contains "." and is never
+  // identifier-shaped). A basename containing "%" is an unexpanded format
+  // template, not the name of a loadable module, so it derives no module
+  // claim and falls through to the later filings.
   for (const value of facts.stringFacts) {
-    if (isContentString(value, excludedNames)) items.add(stringItem(value));
     const base = soBasename(value);
     if (
       base !== null &&
+      !base.includes("%") &&
       !facts.dtNeeded.includes(base) &&
       base !== facts.interpBasename
-    )
+    ) {
       items.add(moduleItem(base));
+      continue;
+    }
     if (
       facts.importsDlsym &&
       IDENTIFIER.test(value) &&
       value.length >= 4 &&
       !excludedNames.has(value)
-    )
+    ) {
       items.add(symbolItem(value));
+      continue;
+    }
+    if (isContentString(value, excludedNames)) items.add(stringItem(value));
   }
   return { items, outputs: new Map() };
 };
@@ -101,10 +121,13 @@ export const staticClaims = (facts) => {
 export const dynamicClaims = (base, observation, context, stimulusId) => {
   const items = new Set(base.items);
   const outputs = new Map(base.outputs);
+  // String claims come only from the output-function argument channel
+  // (texts: puts/fputs arguments, printf-family format arguments). The
+  // stdout stream is filed as the output claim below, never re-filed
+  // line by line as strings; dlopen paths file as modules only and
+  // dlsym names as symbols only.
   const observedTexts = new Set();
   for (const text of observation.texts) observedTexts.add(text);
-  for (const line of observation.stdout.split("\n"))
-    if (line.length > 0) observedTexts.add(line);
   for (const text of observedTexts) {
     if (text.startsWith("MARK:")) continue;
     items.add(stringItem(text));
@@ -113,12 +136,10 @@ export const dynamicClaims = (base, observation, context, stimulusId) => {
     if (!load.ok) continue;
     const baseName = soBasename(load.path);
     if (baseName !== null) items.add(moduleItem(baseName));
-    items.add(stringItem(load.path));
   }
   for (const sym of observation.dlsym) {
     if (!sym.ok) continue;
     items.add(symbolItem(sym.name));
-    items.add(stringItem(sym.name));
   }
   // Executed functions: a function's authored attribution line (MARK:<name>,
   // visible in the binary's own strings) appears in this stimulus's stdout.

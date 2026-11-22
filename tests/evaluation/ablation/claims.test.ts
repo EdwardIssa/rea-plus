@@ -65,8 +65,20 @@ describe("static claims", () => {
     expect(claims.items.has("module:libplug1.so")).toBe(true);
     expect(claims.items.has("module:libc.so.6")).toBe(false);
     expect(claims.items.has("module:ld-linux-x86-64.so.2")).toBe(false);
-    expect(claims.items.has("string:./libplug1.so")).toBe(true);
+    // Follow-up vocabulary: a fact filed as a module is not also filed
+    // as a string (run 1 filed "./libplug1.so" under both kinds).
+    expect(claims.items.has("string:./libplug1.so")).toBe(false);
     expect(claims.items.has("string:/lib64/ld-linux-x86-64.so.2")).toBe(false);
+  });
+
+  it("files an unexpanded format template as a string only, never a module", () => {
+    const claims = staticClaims({
+      ...factsBase,
+      stringFacts: ["./lib%s%s.so"],
+      importsDlsym: true,
+    } as never);
+    expect(claims.items.has("module:lib%s%s.so")).toBe(false);
+    expect(claims.items.has("string:./lib%s%s.so")).toBe(true);
   });
 
   it("excludes symbol-table names, section names, and versioned references as content", () => {
@@ -114,6 +126,11 @@ describe("static claims", () => {
     expect(withDlsym.items.has("symbol:plug_greet")).toBe(true);
     expect(withDlsym.items.has("symbol:_edata")).toBe(false);
     expect(without.items.has("symbol:plug_greet")).toBe(false);
+    // Follow-up vocabulary: a fact filed as a symbol is not also filed
+    // as a string; without the symbol derivation the same fact is an
+    // ordinary content string.
+    expect(withDlsym.items.has("string:plug_greet")).toBe(false);
+    expect(without.items.has("string:plug_greet")).toBe(true);
   });
 
   it("claims no functions, edges, or outputs", () => {
@@ -168,6 +185,53 @@ describe("dynamic claims", () => {
     );
     expect(claims.items.has("edge:choose>plug_greet@s1")).toBe(false);
     expect(claims.items.has("function:plug_greet@s1")).toBe(false);
+  });
+
+  it("files dlopen paths as modules only and dlsym names as symbols only", () => {
+    const claims = dynamicClaims(
+      base as never,
+      observation as never,
+      { candidateEdges: [] } as never,
+      "s1",
+    );
+    expect(claims.items.has("module:libplug1.so")).toBe(true);
+    expect(claims.items.has("string:./libplug1.so")).toBe(false);
+    expect(claims.items.has("symbol:plug_greet")).toBe(true);
+    expect(claims.items.has("string:plug_greet")).toBe(false);
+  });
+
+  it("does not file stdout lines as strings; the stream is the output claim", () => {
+    const claims = dynamicClaims(
+      base as never,
+      {
+        texts: [],
+        stdout: "MARK:main\nassembled-at-runtime\n",
+        dlopen: [],
+        dlsym: [],
+      } as never,
+      { candidateEdges: [] } as never,
+      "s1",
+    );
+    expect(claims.items.has("string:assembled-at-runtime")).toBe(false);
+    expect(claims.outputs.get("s1")).toBe("MARK:main\nassembled-at-runtime\n");
+  });
+
+  it("keeps a string claim when the text arrives through the argument channel", () => {
+    // Channel principle: the same text observed via puts is a string
+    // observation even when it is also a dlopen path.
+    const claims = dynamicClaims(
+      base as never,
+      {
+        texts: ["./libplug1.so"],
+        stdout: "MARK:main\n",
+        dlopen: [{ path: "./libplug1.so", ok: true }],
+        dlsym: [],
+      } as never,
+      { candidateEdges: [] } as never,
+      "s1",
+    );
+    expect(claims.items.has("string:./libplug1.so")).toBe(true);
+    expect(claims.items.has("module:libplug1.so")).toBe(true);
   });
 
   it("ignores failed dlopen/dlsym observations", () => {
