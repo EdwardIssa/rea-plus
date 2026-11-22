@@ -77,6 +77,7 @@
 * **binary-layout:** admit ELF64 AArch64 and name the refused host ([#8711](https://github.com/EdwardIssa/rea-plus/issues/8711)) ([6442ea0](https://github.com/EdwardIssa/rea-plus/commit/6442ea02cbdabd8cbaa4106bdbe934ea07d0dcef))
 * **browser:** retain compact scenario summaries and selected views ([#7120](https://github.com/EdwardIssa/rea-plus/issues/7120)) ([fc43e28](https://github.com/EdwardIssa/rea-plus/commit/fc43e285eaae2155d32e2ca0ab5d2181a4e2f1b5))
 * **browser:** reuse saved response values across scenario steps ([#7267](https://github.com/EdwardIssa/rea-plus/issues/7267)) ([3fcbabe](https://github.com/EdwardIssa/rea-plus/commit/3fcbabe593611435ebc26e1eac86706fe60abb6e))
+* **claim-check:** adjudicate producer Evidence via recorded relocations ([1db6a13](https://github.com/EdwardIssa/rea-plus/commit/1db6a135de599a641296f592882383c506ce5f6e))
 * **claim-check:** expose adjudicate_string_claims via CLI and MCP ([5322749](https://github.com/EdwardIssa/rea-plus/commit/53227497581ca5f3fdc7846de07aec79764352bc))
 * **cli:** add CSV and TSV analysis views ([#7254](https://github.com/EdwardIssa/rea-plus/issues/7254)) ([aa6f643](https://github.com/EdwardIssa/rea-plus/commit/aa6f6436c9cb211d913e0b65b150e977d13b7164))
 * **cli:** report opt-in command timings ([#7042](https://github.com/EdwardIssa/rea-plus/issues/7042)) ([d3b31a0](https://github.com/EdwardIssa/rea-plus/commit/d3b31a0e29a67c8d3a2b756ec46744c27f70ea8f))
