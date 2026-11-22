@@ -18,7 +18,13 @@ import {
 } from "./config/mcpInputSchemaProfile.js";
 import { parseMcpOutputSchemaProfile } from "./config/mcpOutputSchemaProfile.js";
 import { parseMcpToolFamilies } from "./config/mcpToolFamilies.js";
+import { parseMcpToolSurface } from "./config/mcpToolSurface.js";
 import { contractsForToolFamilies } from "./contracts/toolFamilies.js";
+import {
+  MCP_CORE_TOOL_NAMES,
+  MCP_DISCOVERY_TOOL_NAMES,
+} from "./server/toolDiscovery.js";
+import { READ_TOOL_RESULT_PAGE_TOOL_NAME } from "./server/toolResultSpillover.js";
 import { promptsForToolFamilies } from "./contracts/promptToolFamilyScope.js";
 import { err, ok } from "./domain/result.js";
 import { PRODUCT_IDENTITY } from "./identity.js";
@@ -600,6 +606,32 @@ const doctorExpectationForEnvironment = (
       : undefined;
   const contracts = contractsForToolFamilies(selection);
   const promptContracts = promptsForToolFamilies(selection);
+  // The connect-time inventory follows the surface selection: the full
+  // surface advertises every contract in scope, while the lazy surface
+  // (the shipped default when nothing is selected) advertises only the
+  // in-scope core and discovery tools and loads the rest on demand. An
+  // invalid selection fails child startup, so expect the complete
+  // in-scope catalog there as with the other selections above. The
+  // catalog identity below always covers the complete in-scope catalog:
+  // registration does not depend on the surface.
+  const surface = parseMcpToolSurface(environment.REA_MCP_TOOL_SURFACE);
+  const lazySurface = surface.ok && (surface.value ?? "lazy") === "lazy";
+  const coreContracts = contracts.filter(({ name }) =>
+    MCP_CORE_TOOL_NAMES.has(name),
+  );
+  // A scoped registration excludes the discovery tools themselves, so a
+  // scoped lazy surface advertises only the in-scope core contracts; an
+  // unscoped lazy surface adds the discovery and spillover-reader tools,
+  // which are surface registrations rather than contracts.
+  const expectedToolNames = !lazySurface
+    ? contracts.map(({ name }) => name)
+    : selection !== undefined
+      ? coreContracts.map(({ name }) => name)
+      : [
+          ...coreContracts.map(({ name }) => name),
+          ...MCP_DISCOVERY_TOOL_NAMES,
+          READ_TOOL_RESULT_PAGE_TOOL_NAME,
+        ];
   return {
     catalog: createCatalogIdentity({
       compactPresentation: compactPresentationForMcpInputSchemaProfile(
@@ -611,7 +643,7 @@ const doctorExpectationForEnvironment = (
         : "full",
       promptContracts,
     }),
-    expectedToolNames: contracts.map(({ name }) => name),
+    expectedToolNames,
     expectedPromptNames: promptContracts.map(({ name }) => name),
   };
 };

@@ -31,6 +31,10 @@ const recordCatalog = async (profile) => {
   const home = await mkdtemp(join(tmpdir(), "rea-mcp-catalog-"));
   const environment = {
     REA_MCP_INPUT_SCHEMA_PROFILE: profile,
+    // The recorded catalog is the complete inventory the deferred entry
+    // serves and discovery searches; recording composes the full surface
+    // explicitly, independent of the connect-time default.
+    REA_MCP_TOOL_SURFACE: "full",
     HOME: home,
     USERPROFILE: home,
     XDG_CONFIG_HOME: join(home, "config"),

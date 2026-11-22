@@ -141,7 +141,7 @@ export const runDeferred = async (
     dependencies.env.REA_MCP_TOOL_SURFACE,
   );
   if (!surface.ok) throw surface.error;
-  const toolSurfaceMode = surface.value ?? "full";
+  const toolSurfaceMode = surface.value ?? "lazy";
   let firstCatalog: RecordedMcpCatalog | undefined = readCatalog(profile);
   const servers = new OwnedMcpServers<DeferredEvidenceMcpServer>();
   let handle: McpServerHandle | undefined;

@@ -85,11 +85,27 @@ const httpRuntimeDependencies = (
   };
 };
 
+/**
+ * The shipped connect-time tool-surface default: lazy (core plus
+ * discovery) unless the caller selected a surface. Applied here, at the
+ * entry every production serve path funnels through, so the deferred
+ * and eager entries share one default while bare compositions keep
+ * their own fallback.
+ */
+const withShippedToolSurfaceDefault = (
+  environment: Readonly<NodeJS.ProcessEnv>,
+): NodeJS.ProcessEnv =>
+  environment.REA_MCP_TOOL_SURFACE === undefined
+    ? { ...environment, REA_MCP_TOOL_SURFACE: "lazy" }
+    : environment;
+
 /** Start discovery without constructing unused analysis validators. */
 export const run = async (
   dependencies: RuntimeDependencies = runtimeDependencies(),
 ): Promise<number> => {
-  const environment = snapshotEnvironment(dependencies.env);
+  const environment = withShippedToolSurfaceDefault(
+    snapshotEnvironment(dependencies.env),
+  );
   const config = parseConfig(environment);
   if (!config.ok) {
     dependencies.writeStderr(`${projectAnalysisError(config.error).message}\n`);
@@ -103,9 +119,10 @@ export const run = async (
   // scoped one composes the canonical scope itself instead of advertising
   // tools whose identity the runtime cannot verify.
   const scopedToolFamilies = environment.REA_MCP_TOOL_FAMILIES !== undefined;
-  // The tool surface stays the caller's selection on both entries: full
-  // advertisement by default, REA_MCP_TOOL_SURFACE=lazy opts into the
-  // core-plus-discovery surface.
+  // The tool surface stays the caller's selection on both entries: the
+  // environment above already carries the shipped lazy default when the
+  // caller selected nothing; REA_MCP_TOOL_SURFACE=full opts into full
+  // advertisement.
   if (
     RECORDED_MCP_CATALOG_SHA256 !== undefined &&
     dependencies.transport !== "http" &&

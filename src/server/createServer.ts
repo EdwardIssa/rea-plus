@@ -905,5 +905,9 @@ const selectToolSurfaceMode = (
 ): McpToolSurfaceMode => {
   const configured = parseMcpToolSurface(environment.REA_MCP_TOOL_SURFACE);
   if (!configured.ok) throw configured.error;
+  // Composition fallback only: the shipped entry (main.ts) supplies the
+  // lazy connect-time default in the environment it hands down, and the
+  // catalog recorder selects the full surface explicitly. A bare
+  // composition with no selection keeps the historical full surface.
   return configured.value ?? "full";
 };

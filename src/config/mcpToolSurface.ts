@@ -16,7 +16,7 @@ export const mcpToolSurfaceSchema = z.enum(["full", "lazy"]);
 export type McpToolSurfaceMode = z.infer<typeof mcpToolSurfaceSchema>;
 
 const surfaceConstraint =
-  'REA_MCP_TOOL_SURFACE must be "full" or "lazy" (default "full"). The lazy surface advertises only core and discovery tools at connect; all other tools remain registered and load on demand.';
+  'REA_MCP_TOOL_SURFACE must be "full" or "lazy" (default "lazy"). The lazy surface advertises only core and discovery tools at connect; all other tools remain registered and load on demand.';
 
 /** Parse the advertised-surface selection at server composition. */
 export const parseMcpToolSurface = (
