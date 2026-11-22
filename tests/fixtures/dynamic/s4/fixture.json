@@ -1,0 +1,14 @@
+{
+  "build": { "containment": true, "link": [], "sources": ["main.c"] },
+  "class": "S",
+  "stimuli": [
+    {
+      "argv": [],
+      "env": {},
+      "stdin": null,
+      "stimulus_id": "s1",
+      "timeout_ms": 20000
+    }
+  ],
+  "target_id": "s4"
+}

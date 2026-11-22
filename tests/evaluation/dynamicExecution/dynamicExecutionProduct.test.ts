@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,6 +38,33 @@ const truthOf = (id: string): Record<string, unknown> =>
   ) as Record<string, unknown>;
 const sha256Of = (path: string): string =>
   createHash("sha256").update(readFileSync(path)).digest("hex");
+
+/**
+ * Pids of s4 escapees alive on the host: processes whose cmdline is the
+ * fixture's distinctive different-image invocation (`sleep 31337`). The
+ * supervisor's own survivor verification cannot see these (it scans for
+ * the target's exe image), so the s4 test checks the host directly.
+ */
+const s4EscapeePids = (): number[] => {
+  const found: number[] = [];
+  for (const entry of readdirSync("/proc")) {
+    if (!/^\d+$/u.test(entry)) continue;
+    try {
+      const parts = readFileSync(`/proc/${entry}/cmdline`, "utf8")
+        .split("\0")
+        .filter((part) => part.length > 0);
+      if (
+        parts.length === 2 &&
+        (parts[0] === "sleep" || parts[0]?.endsWith("/sleep") === true) &&
+        parts[1] === "31337"
+      )
+        found.push(Number(entry));
+    } catch {
+      // Process exited mid-scan or is not ours to inspect.
+    }
+  }
+  return found;
+};
 
 beforeAll(() => {
   buildFixtures();
@@ -298,6 +325,63 @@ describe("execute_dynamically containment on the product path", () => {
       survivors_after: [],
     });
     expect(nr.output.stdout).toContain("escapee-spawned");
+  }, 180_000);
+
+  it("s4 different-image escapee is reaped only through the subreaper: deadline, no survivors, no breach", async () => {
+    const temp = await createTestTempDirectory("rea-dynexec-eval-s4-");
+    const evidencePath = join(temp, "s4.evidence.json");
+    const result = await runDynamicExecutionCommand({
+      targetPath: binaryOf("s4"),
+      sessionTimeoutMs: 3_000,
+      deadlineMs: 9_000,
+      evidencePath,
+    });
+    if (!result.ok) throw result.error;
+    expect(result.value.status).toBe("terminated");
+    expect(result.value.supervisor.reason).toBe("deadline");
+    const evidence = parseEvidence(
+      JSON.parse(await readFile(evidencePath, "utf8")),
+    ) as Evidence;
+    const nr = evidence.normalized_result as {
+      execution: {
+        containment: { breach: boolean; survivors_after: string[] };
+      };
+      output: { stdout: string };
+    };
+    expect(nr.execution.containment).toEqual({
+      breach: false,
+      survivors_after: [],
+    });
+    expect(nr.output.stdout).toContain("escapee-spawned");
+    // The Evidence containment check scans only for processes running
+    // the target's own exe image; an escapee that exec'd a different
+    // image (/bin/sleep) is invisible to it. Verify independently at
+    // the host level: the fixture's escapee runs /bin/sleep with a
+    // distinctive duration, so scan /proc cmdlines for exactly that
+    // invocation. This is the assertion that makes the subreaper
+    // load-bearing: with the shim dropped from the chain, the orphaned
+    // escapee reparents to the host init instead of the worker, no
+    // cascade layer can see it, and this scan finds it alive.
+    const escapees = s4EscapeePids();
+    try {
+      expect(escapees).toEqual([]);
+    } finally {
+      // Never leak a live escapee into the host, even on failure.
+      for (const pid of escapees) {
+        try {
+          process.kill(pid, "SIGKILL");
+        } catch {
+          // Already gone.
+        }
+      }
+    }
+    // The service is healthy for a subsequent run.
+    const after = await runDynamicExecutionCommand({
+      targetPath: binaryOf("a1"),
+      evidencePath: join(temp, "a1.evidence.json"),
+    });
+    if (!after.ok) throw after.error;
+    expect(after.value.status).toBe("complete");
   }, 180_000);
 });
 
