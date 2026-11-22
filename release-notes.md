@@ -54,6 +54,7 @@
 ### Features
 
 * **ablation:** dynamic-execution ablation harness, fixture corpus, and verdict tooling ([59ac83c](https://github.com/EdwardIssa/rea-plus/commit/59ac83cb35a963b8a433d2172ce2073cae73cf76))
+* **ablation:** one-kind-per-observation claim vocabulary (EXTEND follow-up) ([64c9f08](https://github.com/EdwardIssa/rea-plus/commit/64c9f08e32abb754d909b9772db36f257ee3cdc2))
 * **android:** apply caller-selected R8 mapping evidence ([#7456](https://github.com/EdwardIssa/rea-plus/issues/7456)) ([03f17cf](https://github.com/EdwardIssa/rea-plus/commit/03f17cf41d3c844f9383d7792d9b1a14330d0bb2))
 * **android:** expose selected manifest component declarations ([#7379](https://github.com/EdwardIssa/rea-plus/issues/7379)) ([7e8f7f6](https://github.com/EdwardIssa/rea-plus/commit/7e8f7f6101593cc88cfc63795b47f21c742bee87))
 * **android:** link native declarations to static JNI candidates ([#7472](https://github.com/EdwardIssa/rea-plus/issues/7472)) ([570abe9](https://github.com/EdwardIssa/rea-plus/commit/570abe95f2a35b5c580a5ec2fca90c33d4114bdc))
