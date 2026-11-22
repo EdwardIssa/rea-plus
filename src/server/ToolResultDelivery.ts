@@ -31,6 +31,12 @@ import {
   NODE_MAX_STRING_LENGTH,
   TARGET_CONTENT_RESULT_META,
 } from "./toolResultEncoding.js";
+import {
+  MAX_SPILLOVER_CODE_UNITS,
+  projectValueToSerializedBytes,
+  READ_TOOL_RESULT_PAGE_TOOL_NAME,
+  ToolResultSpilloverStore,
+} from "./toolResultSpillover.js";
 
 /** Project a response-budget refusal without labeling REA's reserved string limit as Node's ceiling. */
 export const mcpResponseOverflowProjection = (input: {
@@ -99,6 +105,14 @@ const evidenceBundleOverflowStep = (value: JsonValue): string => {
 export class ToolResultDelivery {
   readonly maximumResponseBytes: number;
   readonly resultBudgetBytes: number;
+  /** Oversized plain results are retained here for spillover paging. */
+  readonly spillover = new ToolResultSpilloverStore();
+  /**
+   * Spillover truncation is active only on the lazy tool surface, where the
+   * paging reader tool is registered; the full surface keeps the established
+   * refusal-and-recovery delivery unchanged.
+   */
+  readonly spilloverTruncationEnabled: boolean;
   constructor(
     maximumResponseBytes: number,
     private readonly nativeContinuation: (
@@ -107,9 +121,12 @@ export class ToolResultDelivery {
       viewSource?: JsonValue,
     ) => Readonly<Record<string, JsonValue>> = () => ({}),
     private readonly noTargetRecovery?: string,
+    options: { readonly spilloverTruncationEnabled?: boolean } = {},
   ) {
     this.maximumResponseBytes = maximumResponseBytes;
     this.resultBudgetBytes = maximumResponseBytes - 1024;
+    this.spilloverTruncationEnabled =
+      options.spilloverTruncationEnabled ?? false;
     Object.freeze(this);
   }
 
@@ -119,6 +136,7 @@ export class ToolResultDelivery {
       this.maximumResponseBytes,
       this.nativeContinuation,
       recovery,
+      { spilloverTruncationEnabled: this.spilloverTruncationEnabled },
     );
   }
 
@@ -133,6 +151,7 @@ export class ToolResultDelivery {
           contract.kind === "session" ? { result: result.value } : result.value,
           contract,
           recovery,
+          true,
         )
       : this.toErrorToolResult(result.error, contract.returnsTargetContent);
   }
@@ -265,6 +284,54 @@ export class ToolResultDelivery {
     );
   }
 
+  /**
+   * Deliver a schema-shaped projection of an oversized plain result and
+   * retain its complete canonical text for spillover paging. Returns
+   * undefined when the value cannot be projected within the budget, so the
+   * caller keeps the established refusal path.
+   */
+  private truncatedResult(
+    value: JsonValue,
+    contract: ToolContract,
+  ): CallToolResult | undefined {
+    let fullText: string;
+    try {
+      fullText = JSON.stringify(value);
+    } catch {
+      return undefined;
+    }
+    if (fullText.length > MAX_SPILLOVER_CODE_UNITS) return undefined;
+    for (const divisor of [2, 4, 8]) {
+      const projected = projectValueToSerializedBytes(
+        value,
+        Math.floor(this.resultBudgetBytes / divisor),
+      );
+      if (projected === undefined) continue;
+      const encoded = encodeToolResult(
+        projected,
+        this.resultBudgetBytes,
+        "structured-and-text",
+        contract.returnsTargetContent,
+      );
+      if (!encoded.ok) continue;
+      const spilloverId = this.spillover.put(contract.name, fullText);
+      return {
+        content: [{ type: "text", text: encoded.text }],
+        structuredContent: projected,
+        _meta: {
+          spillover: {
+            spillover_id: spilloverId,
+            tool: contract.name,
+            truncated: true,
+            full_code_units: fullText.length,
+            reader_tool: READ_TOOL_RESULT_PAGE_TOOL_NAME,
+          },
+        },
+      };
+    }
+    return undefined;
+  }
+
   private projectedErrorResult(
     projected: AnalysisErrorProjection,
     targetContent: boolean,
@@ -292,6 +359,7 @@ export class ToolResultDelivery {
     value: JsonValue,
     contract: ToolContract,
     recovery: Readonly<Record<string, JsonValue>> = {},
+    spilloverEligible = false,
   ): CallToolResult {
     const encoded = encodeToolResult(
       value,
@@ -307,6 +375,25 @@ export class ToolResultDelivery {
           ? { _meta: TARGET_CONTENT_RESULT_META }
           : {}),
       };
+    // Plain oversized results truncate with spillover instead of refusing:
+    // the projection keeps the result's schema shape and the complete text
+    // stays pageable on this connection. Evidence deliveries, retained-view
+    // continuations, target-content results, and tools with their own paging
+    // keep the established refusal-and-recovery path below.
+    if (
+      this.spilloverTruncationEnabled &&
+      spilloverEligible &&
+      !contract.returnsTargetContent &&
+      encoded.constraint === "receive-buffer" &&
+      recovery.continuation === undefined &&
+      recovery.evidence_reference === undefined &&
+      recovery.committed_unknown === undefined &&
+      contract.name !== "list_unknowns" &&
+      contract.name !== "get_evidence_bundle"
+    ) {
+      const truncated = this.truncatedResult(value, contract);
+      if (truncated !== undefined) return truncated;
+    }
     const retainedEvidence = recovery.evidence_reference !== undefined;
     const nextStep =
       recovery.committed_unknown !== undefined

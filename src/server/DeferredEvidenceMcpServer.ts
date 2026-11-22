@@ -8,11 +8,21 @@ import type {
 import type { PromptCompletionSource } from "./promptCompletion.js";
 import type { RecordedMcpCatalog } from "../recordedMcpCatalog.js";
 import type { ToolResultDelivery } from "./ToolResultDelivery.js";
+import type { McpToolSurfaceMode } from "../config/mcpToolSurface.js";
 import {
   EvidenceMcpServerCore,
   currentMcpRequestSignal,
   type StandardToolRegistration,
 } from "./EvidenceMcpServerCore.js";
+import {
+  MCP_DISCOVERY_TOOL_NAMES,
+  registerDiscoveryTools,
+} from "./toolDiscovery.js";
+import {
+  READ_TOOL_RESULT_PAGE_TOOL_NAME,
+  registerSpilloverTool,
+  type SurfaceToolBinder,
+} from "./toolResultSpillover.js";
 import { promptArgumentsSchema } from "./promptArguments.js";
 import { SERVER_START_FAILED } from "../main/messages.js";
 
@@ -44,6 +54,8 @@ const recordedProjection = (
 export class DeferredEvidenceMcpServer extends EvidenceMcpServerCore {
   private readonly tools = new Map<string, DeferredTool>();
   private readonly prompts = new Map<string, DeferredPrompt>();
+  /** Surface tools bound directly; they answer before materialization. */
+  private readonly surfaceTools = new Map<string, RegisteredTool>();
   private loading: Promise<void> | undefined;
   private closing = false;
   private closeAttempt: Promise<void> | undefined;
@@ -60,8 +72,13 @@ export class DeferredEvidenceMcpServer extends EvidenceMcpServerCore {
     private readonly initialize: (
       server: DeferredEvidenceMcpServer,
     ) => Promise<void>,
-    maximumInputElements?: number,
+    options: {
+      readonly maximumInputElements?: number;
+      readonly toolSurfaceMode?: McpToolSurfaceMode;
+    } = {},
   ) {
+    const maximumInputElements = options.maximumInputElements;
+    const toolSurfaceMode = options.toolSurfaceMode ?? "full";
     super(
       catalog.info,
       {
@@ -77,6 +94,8 @@ export class DeferredEvidenceMcpServer extends EvidenceMcpServerCore {
       // `main.ts` only defers the exact full advertisement catalog.
       "full",
       catalog.identity,
+      undefined,
+      toolSurfaceMode,
     );
     for (const name of catalog.evidenceReferenceAlternatives)
       this.registerEvidenceReferenceAlternative(name);
@@ -173,6 +192,20 @@ export class DeferredEvidenceMcpServer extends EvidenceMcpServerCore {
       binding = { registered };
       this.prompts.set(name, binding);
     }
+    // The lazy surface's own tools answer from the recorded catalog and the
+    // surface state, so they bind directly and never materialize the
+    // runtime. In full mode they join at materialization instead, keeping
+    // the pre-materialization advertisement identical to the catalog.
+    if (this.toolSurface.discoveryEnabled) {
+      const bind: SurfaceToolBinder = (name, config, callback) => {
+        this.surfaceTools.set(
+          name,
+          super.bindTool(name, config, callback as never),
+        );
+      };
+      registerDiscoveryTools(bind, this.toolSurface);
+      registerSpilloverTool(bind, this);
+    }
   }
 
   ensureRuntime(): Promise<void> {
@@ -216,6 +249,24 @@ export class DeferredEvidenceMcpServer extends EvidenceMcpServerCore {
     config: ToolConfig,
     callback: ToolCallback<StandardSchemaWithJSON | undefined>,
   ): RegisteredTool {
+    // Surface tools are not catalog tools: under the lazy surface they are
+    // already bound and materialization only adopts the canonical callback;
+    // under the full surface they bind here, at materialization.
+    if (
+      name === READ_TOOL_RESULT_PAGE_TOOL_NAME ||
+      MCP_DISCOVERY_TOOL_NAMES.has(name)
+    ) {
+      const existing = this.surfaceTools.get(name);
+      if (existing !== undefined) {
+        existing.update({ callback: callback as never });
+        return existing;
+      }
+      if (!this.materializing)
+        throw new Error("Unexpected MCP runtime registration");
+      const registered = super.bindTool(name, config, callback);
+      this.surfaceTools.set(name, registered);
+      return registered;
+    }
     const binding = this.tools.get(name);
     if (
       !this.materializing ||

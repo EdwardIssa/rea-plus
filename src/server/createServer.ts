@@ -53,6 +53,15 @@ import {
   compactPresentationForMcpInputSchemaProfile,
   parseMcpInputSchemaProfile,
 } from "../config/mcpInputSchemaProfile.js";
+import {
+  parseMcpToolSurface,
+  type McpToolSurfaceMode,
+} from "../config/mcpToolSurface.js";
+import { registerDiscoveryTools } from "./toolDiscovery.js";
+import {
+  registerSpilloverTool,
+  type SurfaceToolBinder,
+} from "./toolResultSpillover.js";
 import type { CompactInputSchemaPresentation } from "../contracts/compactInputSchema.js";
 import type { BinarySessionPort } from "../application/binary/BinarySessionPort.js";
 import { PRODUCT_IDENTITY } from "../identity.js";
@@ -122,6 +131,7 @@ const createMcpServer = (
   outputSchemaProfile: McpOutputSchemaProfile,
   advertisedToolFamilies: ReadonlySet<string> | undefined,
   inputElementBudget: string | undefined,
+  toolSurfaceMode: McpToolSurfaceMode,
 ): EvidenceMcpServer => {
   const configured = parseMcpInputBudget(inputElementBudget);
   if (!configured.ok) throw configured.error;
@@ -150,8 +160,15 @@ const createMcpServer = (
       advertisedToolFamilies,
     ),
     advertisedToolFamilies,
+    toolSurfaceMode,
   );
 };
+
+/** Bind surface tools through the server's canonical registration. */
+const surfaceToolBinder = (server: EvidenceMcpServer): SurfaceToolBinder =>
+  (name, config, callback) => {
+    server.registerTool(name, config as never, callback as never);
+  };
 
 /**
  * Construct one MCP server without acquiring subprocess resources.
@@ -171,11 +188,16 @@ export const createServer = (
     selectCompactInputSchemaPresentation(environment);
   const selectedOutputSchemaProfile = outputSchemaProfile(environment);
   const advertisedToolFamilies = selectAdvertisedToolFamilies(environment);
+  const toolSurfaceMode = selectToolSurfaceMode(environment);
   const providerEnvironment = captureProviderEnvironment(
     options.providerEnvironment,
     environment,
   );
-  const baseDelivery = selectToolResultDelivery(environment, options.delivery);
+  const baseDelivery = selectToolResultDelivery(
+    environment,
+    options.delivery,
+    toolSurfaceMode === "lazy",
+  );
   const delivery =
     session !== undefined &&
     advertisedToolFamilies !== undefined &&
@@ -247,6 +269,7 @@ export const createServer = (
       selectedOutputSchemaProfile,
       advertisedToolFamilies,
       environment.REA_MCP_MAX_INPUT_ELEMENTS,
+      toolSurfaceMode,
     );
   server.analysisSettings = analysisSettings;
   if (options.mcpServer !== undefined) {
@@ -801,19 +824,28 @@ export const createServer = (
     },
   });
   registerGuidedPrompts(server, analysis, session);
+  // Surface machinery registers last and only exists on the lazy surface:
+  // the contract inventory (and the recorded catalog built from it) stays
+  // the complete full-surface advertisement, so these runtime tools are
+  // scoped to the surface that advertises selectively.
+  if (toolSurfaceMode === "lazy") {
+    registerDiscoveryTools(surfaceToolBinder(server), server.toolSurface);
+    registerSpilloverTool(surfaceToolBinder(server), server);
+  }
   return server;
 };
 
 const selectToolResultDelivery = (
   environment: Readonly<NodeJS.ProcessEnv>,
   selected: ToolResultDelivery | undefined,
+  spilloverTruncationEnabled: boolean,
 ): ToolResultDelivery => {
   if (selected !== undefined) return selected;
   const configured = parseMcpResponseBudget(
     environment.REA_MCP_MAX_RESPONSE_BYTES,
   );
   if (!configured.ok) throw configured.error;
-  return createToolResultDelivery(configured.value);
+  return createToolResultDelivery(configured.value, spilloverTruncationEnabled);
 };
 
 const outputSchemaProfile = (
@@ -866,4 +898,12 @@ const selectAdvertisedToolFamilies = (
   const configured = parseMcpToolFamilies(environment.REA_MCP_TOOL_FAMILIES);
   if (!configured.ok) throw configured.error;
   return configured.value === undefined ? undefined : new Set(configured.value);
+};
+
+const selectToolSurfaceMode = (
+  environment: Readonly<NodeJS.ProcessEnv>,
+): McpToolSurfaceMode => {
+  const configured = parseMcpToolSurface(environment.REA_MCP_TOOL_SURFACE);
+  if (!configured.ok) throw configured.error;
+  return configured.value ?? "full";
 };

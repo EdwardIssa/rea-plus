@@ -103,6 +103,9 @@ export const run = async (
   // scoped one composes the canonical scope itself instead of advertising
   // tools whose identity the runtime cannot verify.
   const scopedToolFamilies = environment.REA_MCP_TOOL_FAMILIES !== undefined;
+  // The tool surface stays the caller's selection on both entries: full
+  // advertisement by default, REA_MCP_TOOL_SURFACE=lazy opts into the
+  // core-plus-discovery surface.
   if (
     RECORDED_MCP_CATALOG_SHA256 !== undefined &&
     dependencies.transport !== "http" &&
