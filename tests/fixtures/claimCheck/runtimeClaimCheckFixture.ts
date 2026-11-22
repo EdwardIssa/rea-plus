@@ -12,6 +12,8 @@ export interface RuntimeRecordOptions {
   readonly logTexts?: readonly string[];
   readonly pid?: number;
   readonly limitations?: readonly string[];
+  /** Subject digest override, for records that must join a real artifact's group. */
+  readonly subjectSha?: string;
 }
 
 /**
@@ -30,7 +32,7 @@ export const runtimeEvidenceRecord = (
   return createEvidence(
     {
       path: "/fixtures/target",
-      sha256: RUNTIME_FIXTURE_SUBJECT_SHA,
+      sha256: options.subjectSha ?? RUNTIME_FIXTURE_SUBJECT_SHA,
       format: "elf",
     },
     { id: "frida", name: "Frida", version: "17.23.2" },
