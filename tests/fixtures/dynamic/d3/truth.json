@@ -1,0 +1,23 @@
+{
+  "strings": ["color-red", "color-blue", "color-none"],
+  "loaded_modules": [],
+  "resolved_symbols": [],
+  "executed_functions": {
+    "s1": ["main", "path_red"],
+    "s2": ["main", "path_blue"]
+  },
+  "call_edges": {
+    "s1": [["main", "path_red"]],
+    "s2": [["main", "path_blue"]]
+  },
+  "outputs": {
+    "s1": "MARK:main\nMARK:path_red\ncolor-red\n",
+    "s2": "MARK:main\nMARK:path_blue\ncolor-blue\n"
+  },
+  "function_markers": {
+    "main": "MARK:main",
+    "path_red": "MARK:path_red",
+    "path_blue": "MARK:path_blue",
+    "path_none": "MARK:path_none"
+  }
+}

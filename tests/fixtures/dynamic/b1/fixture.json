@@ -1,0 +1,23 @@
+{
+  "target_id": "b1",
+  "class": "B",
+  "stimuli": [
+    {
+      "stimulus_id": "s1",
+      "argv": [],
+      "env": {},
+      "stdin": null,
+      "timeout_ms": 20000
+    }
+  ],
+  "build": {
+    "sources": ["main.c"],
+    "link": ["-ldl"],
+    "plugins": [
+      {
+        "name": "libplug1.so",
+        "source": "plugin.c"
+      }
+    ]
+  }
+}

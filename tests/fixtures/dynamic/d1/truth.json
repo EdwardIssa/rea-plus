@@ -1,0 +1,23 @@
+{
+  "strings": ["path-true", "path-false"],
+  "loaded_modules": [],
+  "resolved_symbols": [],
+  "executed_functions": {
+    "s1": ["main", "choose", "branch_true"]
+  },
+  "call_edges": {
+    "s1": [
+      ["main", "choose"],
+      ["choose", "branch_true"]
+    ]
+  },
+  "outputs": {
+    "s1": "MARK:main\nMARK:choose\nMARK:branch_true\npath-true\n"
+  },
+  "function_markers": {
+    "main": "MARK:main",
+    "choose": "MARK:choose",
+    "branch_true": "MARK:branch_true",
+    "branch_false": "MARK:branch_false"
+  }
+}

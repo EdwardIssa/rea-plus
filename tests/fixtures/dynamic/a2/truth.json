@@ -1,0 +1,18 @@
+{
+  "strings": ["bravo-secret-two"],
+  "loaded_modules": [],
+  "resolved_symbols": [],
+  "executed_functions": {
+    "s1": ["main", "unwrap"]
+  },
+  "call_edges": {
+    "s1": [["main", "unwrap"]]
+  },
+  "outputs": {
+    "s1": "MARK:main\nMARK:unwrap\nbravo-secret-two\n"
+  },
+  "function_markers": {
+    "main": "MARK:main",
+    "unwrap": "MARK:unwrap"
+  }
+}

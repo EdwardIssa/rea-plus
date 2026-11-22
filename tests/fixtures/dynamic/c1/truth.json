@@ -1,0 +1,26 @@
+{
+  "strings": ["result-add", "result-sub", "result-mul"],
+  "loaded_modules": [],
+  "resolved_symbols": [],
+  "executed_functions": {
+    "s1": ["main", "op_add"],
+    "s2": ["main", "op_sub"],
+    "s3": ["main", "op_mul"]
+  },
+  "call_edges": {
+    "s1": [["main", "op_add"]],
+    "s2": [["main", "op_sub"]],
+    "s3": [["main", "op_mul"]]
+  },
+  "outputs": {
+    "s1": "MARK:main\nMARK:op_add\nresult-add\n",
+    "s2": "MARK:main\nMARK:op_sub\nresult-sub\n",
+    "s3": "MARK:main\nMARK:op_mul\nresult-mul\n"
+  },
+  "function_markers": {
+    "main": "MARK:main",
+    "op_add": "MARK:op_add",
+    "op_sub": "MARK:op_sub",
+    "op_mul": "MARK:op_mul"
+  }
+}

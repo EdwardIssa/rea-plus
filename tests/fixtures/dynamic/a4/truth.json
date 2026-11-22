@@ -1,0 +1,18 @@
+{
+  "strings": ["https://delta.example.internal/feed"],
+  "loaded_modules": [],
+  "resolved_symbols": [],
+  "executed_functions": {
+    "s1": ["main", "fetch_url"]
+  },
+  "call_edges": {
+    "s1": [["main", "fetch_url"]]
+  },
+  "outputs": {
+    "s1": "MARK:main\nMARK:fetch_url\nhttps://delta.example.internal/feed\n"
+  },
+  "function_markers": {
+    "main": "MARK:main",
+    "fetch_url": "MARK:fetch_url"
+  }
+}

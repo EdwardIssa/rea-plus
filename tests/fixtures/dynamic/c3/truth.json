@@ -1,0 +1,33 @@
+{
+  "strings": ["std-open", "std-close", "alt-open", "alt-close", "direct-done"],
+  "loaded_modules": [],
+  "resolved_symbols": [],
+  "executed_functions": {
+    "s1": ["main", "std_open", "direct_helper", "std_close"],
+    "s2": ["main", "alt_open", "direct_helper", "alt_close"]
+  },
+  "call_edges": {
+    "s1": [
+      ["main", "std_open"],
+      ["main", "direct_helper"],
+      ["main", "std_close"]
+    ],
+    "s2": [
+      ["main", "alt_open"],
+      ["main", "direct_helper"],
+      ["main", "alt_close"]
+    ]
+  },
+  "outputs": {
+    "s1": "MARK:main\nMARK:std_open\nstd-open\nMARK:direct_helper\ndirect-done\nMARK:std_close\nstd-close\n",
+    "s2": "MARK:main\nMARK:alt_open\nalt-open\nMARK:direct_helper\ndirect-done\nMARK:alt_close\nalt-close\n"
+  },
+  "function_markers": {
+    "main": "MARK:main",
+    "std_open": "MARK:std_open",
+    "std_close": "MARK:std_close",
+    "alt_open": "MARK:alt_open",
+    "alt_close": "MARK:alt_close",
+    "direct_helper": "MARK:direct_helper"
+  }
+}

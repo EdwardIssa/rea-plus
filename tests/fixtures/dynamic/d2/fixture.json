@@ -1,0 +1,26 @@
+{
+  "target_id": "d2",
+  "class": "D",
+  "stimuli": [
+    {
+      "stimulus_id": "s1",
+      "argv": [],
+      "env": {},
+      "stdin": null,
+      "timeout_ms": 20000
+    },
+    {
+      "stimulus_id": "s2",
+      "argv": [],
+      "env": {
+        "FEATURE_X": "1"
+      },
+      "stdin": null,
+      "timeout_ms": 20000
+    }
+  ],
+  "build": {
+    "sources": ["main.c"],
+    "link": []
+  }
+}

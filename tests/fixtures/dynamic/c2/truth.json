@@ -1,0 +1,23 @@
+{
+  "strings": ["result-xor", "result-and", "result-or"],
+  "loaded_modules": [],
+  "resolved_symbols": [],
+  "executed_functions": {
+    "s1": ["main", "op_or"],
+    "s2": ["main", "op_xor"]
+  },
+  "call_edges": {
+    "s1": [["main", "op_or"]],
+    "s2": [["main", "op_xor"]]
+  },
+  "outputs": {
+    "s1": "MARK:main\nMARK:op_or\nresult-or\n",
+    "s2": "MARK:main\nMARK:op_xor\nresult-xor\n"
+  },
+  "function_markers": {
+    "main": "MARK:main",
+    "op_xor": "MARK:op_xor",
+    "op_and": "MARK:op_and",
+    "op_or": "MARK:op_or"
+  }
+}

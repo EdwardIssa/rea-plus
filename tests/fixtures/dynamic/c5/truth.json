@@ -1,0 +1,18 @@
+{
+  "strings": [],
+  "loaded_modules": [],
+  "resolved_symbols": [],
+  "executed_functions": {
+    "s1": ["main", "cmp_items"]
+  },
+  "call_edges": {
+    "s1": [["main", "cmp_items"]]
+  },
+  "outputs": {
+    "s1": "MARK:main\nMARK:cmp_items\nsorted-1-2-5-7-9\n"
+  },
+  "function_markers": {
+    "main": "MARK:main",
+    "cmp_items": "MARK:cmp_items"
+  }
+}

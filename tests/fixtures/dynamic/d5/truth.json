@@ -1,0 +1,18 @@
+{
+  "strings": ["golf-decompressed-banner"],
+  "loaded_modules": [],
+  "resolved_symbols": [],
+  "executed_functions": {
+    "s1": ["main", "inflate_rle"]
+  },
+  "call_edges": {
+    "s1": [["main", "inflate_rle"]]
+  },
+  "outputs": {
+    "s1": "MARK:main\nMARK:inflate_rle\ngolf-decompressed-banner\n"
+  },
+  "function_markers": {
+    "main": "MARK:main",
+    "inflate_rle": "MARK:inflate_rle"
+  }
+}

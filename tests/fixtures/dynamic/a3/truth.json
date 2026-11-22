@@ -1,0 +1,18 @@
+{
+  "strings": ["charlie-config-secret"],
+  "loaded_modules": [],
+  "resolved_symbols": [],
+  "executed_functions": {
+    "s1": ["main", "load_config"]
+  },
+  "call_edges": {
+    "s1": [["main", "load_config"]]
+  },
+  "outputs": {
+    "s1": "MARK:main\nMARK:load_config\ncharlie-config-secret\n"
+  },
+  "function_markers": {
+    "main": "MARK:main",
+    "load_config": "MARK:load_config"
+  }
+}

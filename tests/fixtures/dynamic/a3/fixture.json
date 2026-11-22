@@ -1,0 +1,18 @@
+{
+  "target_id": "a3",
+  "class": "A",
+  "stimuli": [
+    {
+      "stimulus_id": "s1",
+      "argv": [],
+      "env": {},
+      "stdin": null,
+      "timeout_ms": 20000
+    }
+  ],
+  "build": {
+    "sources": ["main.c"],
+    "link": ["-lcrypto"],
+    "generated": ["blob.h"]
+  }
+}

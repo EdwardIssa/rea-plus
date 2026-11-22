@@ -1,0 +1,19 @@
+{
+  "strings": ["uid-root-path", "uid-user-path"],
+  "loaded_modules": [],
+  "resolved_symbols": [],
+  "executed_functions": {
+    "s1": ["main", "root_path"]
+  },
+  "call_edges": {
+    "s1": [["main", "root_path"]]
+  },
+  "outputs": {
+    "s1": "MARK:main\nMARK:root_path\nuid-root-path\n"
+  },
+  "function_markers": {
+    "main": "MARK:main",
+    "root_path": "MARK:root_path",
+    "user_path": "MARK:user_path"
+  }
+}

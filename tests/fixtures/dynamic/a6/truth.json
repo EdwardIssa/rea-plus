@@ -1,0 +1,21 @@
+{
+  "strings": ["public-notice-string", "foxtrot-hidden-secret"],
+  "loaded_modules": [],
+  "resolved_symbols": [],
+  "executed_functions": {
+    "s1": ["main"],
+    "s2": ["main", "reveal_secret"]
+  },
+  "call_edges": {
+    "s1": [],
+    "s2": [["main", "reveal_secret"]]
+  },
+  "outputs": {
+    "s1": "MARK:main\npublic-notice-string\n",
+    "s2": "MARK:main\npublic-notice-string\nMARK:reveal_secret\nfoxtrot-hidden-secret\n"
+  },
+  "function_markers": {
+    "main": "MARK:main",
+    "reveal_secret": "MARK:reveal_secret"
+  }
+}

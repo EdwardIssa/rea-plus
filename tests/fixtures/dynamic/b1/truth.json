@@ -1,0 +1,18 @@
+{
+  "strings": ["plug-one-hello"],
+  "loaded_modules": ["libplug1.so"],
+  "resolved_symbols": ["plug_greet"],
+  "executed_functions": {
+    "s1": ["main", "plug_greet"]
+  },
+  "call_edges": {
+    "s1": [["main", "plug_greet"]]
+  },
+  "outputs": {
+    "s1": "MARK:main\nMARK:plug_greet\nplug-one-hello\n"
+  },
+  "function_markers": {
+    "main": "MARK:main",
+    "plug_greet": "MARK:plug_greet"
+  }
+}

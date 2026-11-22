@@ -1,0 +1,18 @@
+{
+  "strings": ["body-done", "cleanup-done"],
+  "loaded_modules": [],
+  "resolved_symbols": [],
+  "executed_functions": {
+    "s1": ["main", "cleanup_handler"]
+  },
+  "call_edges": {
+    "s1": [["main", "cleanup_handler"]]
+  },
+  "outputs": {
+    "s1": "MARK:main\nbody-done\nMARK:cleanup_handler\ncleanup-done\n"
+  },
+  "function_markers": {
+    "main": "MARK:main",
+    "cleanup_handler": "MARK:cleanup_handler"
+  }
+}

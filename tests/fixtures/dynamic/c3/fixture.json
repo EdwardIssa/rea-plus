@@ -1,0 +1,24 @@
+{
+  "target_id": "c3",
+  "class": "C",
+  "stimuli": [
+    {
+      "stimulus_id": "s1",
+      "argv": ["0"],
+      "env": {},
+      "stdin": null,
+      "timeout_ms": 20000
+    },
+    {
+      "stimulus_id": "s2",
+      "argv": ["1"],
+      "env": {},
+      "stdin": null,
+      "timeout_ms": 20000
+    }
+  ],
+  "build": {
+    "sources": ["main.c"],
+    "link": []
+  }
+}

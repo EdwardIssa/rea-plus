@@ -1,0 +1,22 @@
+{
+  "strings": ["plug-four-hello"],
+  "loaded_modules": ["libplug4.so"],
+  "resolved_symbols": ["plug_get_handler"],
+  "executed_functions": {
+    "s1": ["main", "plug_get_handler", "plug_handler"]
+  },
+  "call_edges": {
+    "s1": [
+      ["main", "plug_get_handler"],
+      ["main", "plug_handler"]
+    ]
+  },
+  "outputs": {
+    "s1": "MARK:main\nMARK:plug_get_handler\nMARK:plug_handler\nplug-four-hello\n"
+  },
+  "function_markers": {
+    "main": "MARK:main",
+    "plug_get_handler": "MARK:plug_get_handler",
+    "plug_handler": "MARK:plug_handler"
+  }
+}

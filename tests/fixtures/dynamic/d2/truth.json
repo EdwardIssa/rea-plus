@@ -1,0 +1,22 @@
+{
+  "strings": ["feature-enabled", "feature-disabled"],
+  "loaded_modules": [],
+  "resolved_symbols": [],
+  "executed_functions": {
+    "s1": ["main", "feature_off"],
+    "s2": ["main", "feature_on"]
+  },
+  "call_edges": {
+    "s1": [["main", "feature_off"]],
+    "s2": [["main", "feature_on"]]
+  },
+  "outputs": {
+    "s1": "MARK:main\nMARK:feature_off\nfeature-disabled\n",
+    "s2": "MARK:main\nMARK:feature_on\nfeature-enabled\n"
+  },
+  "function_markers": {
+    "main": "MARK:main",
+    "feature_on": "MARK:feature_on",
+    "feature_off": "MARK:feature_off"
+  }
+}

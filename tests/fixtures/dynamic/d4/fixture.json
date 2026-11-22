@@ -1,0 +1,17 @@
+{
+  "target_id": "d4",
+  "class": "D",
+  "stimuli": [
+    {
+      "stimulus_id": "s1",
+      "argv": [],
+      "env": {},
+      "stdin": null,
+      "timeout_ms": 20000
+    }
+  ],
+  "build": {
+    "sources": ["main.c"],
+    "link": []
+  }
+}

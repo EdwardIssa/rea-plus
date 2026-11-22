@@ -1,0 +1,18 @@
+{
+  "strings": ["alpha-secret-one"],
+  "loaded_modules": [],
+  "resolved_symbols": [],
+  "executed_functions": {
+    "s1": ["main", "reveal"]
+  },
+  "call_edges": {
+    "s1": [["main", "reveal"]]
+  },
+  "outputs": {
+    "s1": "MARK:main\nMARK:reveal\nalpha-secret-one\n"
+  },
+  "function_markers": {
+    "main": "MARK:main",
+    "reveal": "MARK:reveal"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "target_id": "b2",
+  "class": "B",
+  "stimuli": [
+    {
+      "stimulus_id": "s1",
+      "argv": ["a"],
+      "env": {},
+      "stdin": null,
+      "timeout_ms": 20000
+    },
+    {
+      "stimulus_id": "s2",
+      "argv": ["b"],
+      "env": {},
+      "stdin": null,
+      "timeout_ms": 20000
+    }
+  ],
+  "build": {
+    "sources": ["main.c"],
+    "link": ["-ldl"],
+    "plugins": [
+      {
+        "name": "libplugA.so",
+        "source": "pluginA.c"
+      },
+      {
+        "name": "libplugB.so",
+        "source": "pluginB.c"
+      }
+    ]
+  }
+}

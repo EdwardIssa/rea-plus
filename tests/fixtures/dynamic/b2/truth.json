@@ -1,0 +1,21 @@
+{
+  "strings": ["plug-alpha-hello", "plug-beta-hello"],
+  "loaded_modules": ["libplugA.so", "libplugB.so"],
+  "resolved_symbols": ["plug_greet"],
+  "executed_functions": {
+    "s1": ["main", "plug_greet"],
+    "s2": ["main", "plug_greet"]
+  },
+  "call_edges": {
+    "s1": [["main", "plug_greet"]],
+    "s2": [["main", "plug_greet"]]
+  },
+  "outputs": {
+    "s1": "MARK:main\nMARK:plug_greet\nplug-alpha-hello\n",
+    "s2": "MARK:main\nMARK:plug_greet\nplug-beta-hello\n"
+  },
+  "function_markers": {
+    "main": "MARK:main",
+    "plug_greet": "MARK:plug_greet"
+  }
+}
