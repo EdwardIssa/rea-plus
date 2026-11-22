@@ -31,6 +31,7 @@ import { ELECTRON_TOOL_CONTRACTS } from "./javascript/electronToolContracts.js";
 import { JAVASCRIPT_RUNTIME_OBSERVATION_TOOL_CONTRACTS } from "./javascript/javascriptRuntimeObservationToolContracts.js";
 import { APPLICATION_TOOL_CONTRACTS } from "./applicationToolContracts.js";
 import { CLAIM_CHECK_TOOL_CONTRACTS } from "./claimCheck/claimCheckToolContracts.js";
+import { RUNTIME_CLAIM_CHECK_TOOL_CONTRACTS } from "./claimCheck/runtimeClaimCheckToolContracts.js";
 import { DYNAMIC_EXECUTION_TOOL_CONTRACTS } from "./dynamicExecution/dynamicExecutionToolContracts.js";
 import { WEB_SCRIPT_TOOL_CONTRACTS } from "./webScriptToolContracts.js";
 import { WEB_RUNTIME_TOOL_CONTRACTS } from "./webRuntimeToolContracts.js";
@@ -83,6 +84,7 @@ export const TOOL_CONTRACTS = [
   ...JAVASCRIPT_RUNTIME_OBSERVATION_TOOL_CONTRACTS,
   ...APPLICATION_TOOL_CONTRACTS,
   ...CLAIM_CHECK_TOOL_CONTRACTS,
+  ...RUNTIME_CLAIM_CHECK_TOOL_CONTRACTS,
   ...DYNAMIC_EXECUTION_TOOL_CONTRACTS,
   ...WEB_SCRIPT_TOOL_CONTRACTS,
   ...WEB_RUNTIME_TOOL_CONTRACTS,

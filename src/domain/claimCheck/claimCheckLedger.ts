@@ -8,13 +8,29 @@ import {
 } from "../canonicalOrdering.js";
 import { digestSchema, prefixedDigestSchema } from "../digests.js";
 import type { ClaimRecord } from "./claimRecord.js";
+import type { RuntimeClaimRecord } from "./runtimeClaimRecord.js";
+import {
+  replayObservedSchema,
+  runtimeAdjudicationReasonSchema,
+  type RuntimeClaimVerdict,
+} from "./runtimeReplayValidator.js";
 import {
   adjudicationReasonSchema,
   adjudicationStateSchema,
-  type AdjudicationReason,
   type AdjudicationState,
   type StringClaimVerdict,
 } from "./stringClaimValidator.js";
+
+/**
+ * The ledger's full reason vocabulary: the string class's reasons plus the
+ * runtime class's. Additive — ledgers written before the runtime class
+ * existed still parse, since every value they carry remains in the union.
+ */
+export const claimCheckReasonSchema = z.enum([
+  ...adjudicationReasonSchema.options,
+  ...runtimeAdjudicationReasonSchema.options,
+]);
+export type ClaimCheckReason = z.infer<typeof claimCheckReasonSchema>;
 
 /** prev_digest of the first entry in every ledger. */
 const GENESIS_DIGEST = "0".repeat(64);
@@ -36,14 +52,17 @@ const adjudicationRecordSchema = z.strictObject({
   claim_id: prefixedDigestSchema("cc"),
   claim_version: digestSchema,
   state: adjudicationStateSchema,
-  reason: adjudicationReasonSchema,
+  reason: claimCheckReasonSchema,
   validator: validatorIdentitySchema,
   label: z.enum(["verified-fact", "unverified"]),
   observed: z
-    .strictObject({
-      bytes_digest: digestSchema,
-      byte_length: z.int().min(0),
-    })
+    .union([
+      z.strictObject({
+        bytes_digest: digestSchema,
+        byte_length: z.int().min(0),
+      }),
+      replayObservedSchema,
+    ])
     .exactOptional(),
   evidence_refs: z.array(prefixedDigestSchema("ev")),
   prev_digest: digestSchema,
@@ -274,7 +293,7 @@ export const claimCheckLedgerCompleteness = (
 export interface ResolvedClaimState {
   readonly claim_version: string | null;
   readonly state: AdjudicationState | null;
-  readonly reason: AdjudicationReason | null;
+  readonly reason: ClaimCheckReason | null;
   readonly stale: boolean;
 }
 
@@ -314,11 +333,42 @@ export const resolveClaimCheckStates = (
   return resolved;
 };
 
+/** The ledger's view of one registered claim, whichever class produced it. */
+interface LedgerClaim {
+  readonly claim_id: string;
+  readonly claim_version: string;
+  readonly subject: { readonly sha256: string; readonly format: string };
+  readonly evidence_refs: readonly string[];
+  readonly dependencies: readonly string[];
+}
+
+const normalizeClaimShape = (
+  claim: ClaimRecord | RuntimeClaimRecord,
+): LedgerClaim =>
+  "evidence_ref" in claim
+    ? {
+        claim_id: claim.claim_id,
+        claim_version: claim.claim_version,
+        subject: claim.subject,
+        evidence_refs: [claim.evidence_ref],
+        dependencies: claim.dependencies,
+      }
+    : {
+        claim_id: claim.claim_id,
+        claim_version: claim.claim_version,
+        subject: claim.subject,
+        evidence_refs: claim.evidence_refs,
+        dependencies: claim.dependencies,
+      };
+
+type LedgerVerdict = StringClaimVerdict | RuntimeClaimVerdict;
+
 /**
  * The muscle: the only component that appends to a claim-check ledger.
  * It enforces append-only hash chaining, per-run deduplication, and the stale
  * cascade, and it writes the RunCommit last. A verdict it cannot chain is
- * never recorded.
+ * never recorded. Both claim classes share this append path; the string
+ * class's behavior through it is unchanged.
  */
 export interface ClaimCheckLedgerWriter {
   /**
@@ -327,21 +377,45 @@ export interface ClaimCheckLedgerWriter {
    * presentation is a no-op). Refutations cascade stale marks to dependents.
    */
   appendAdjudication(claim: ClaimRecord, verdict: StringClaimVerdict): boolean;
+  appendAdjudication(
+    claim: RuntimeClaimRecord,
+    verdict: RuntimeClaimVerdict,
+  ): boolean;
   /** Close the run with its RunCommit and return the verified ledger. */
   commitRun(sourceEvidenceIds: readonly string[]): ClaimCheckLedger;
   /** The ledger as it stands, without a RunCommit: an incomplete run. */
   incompleteLedger(): ClaimCheckLedger;
 }
 
-export const createClaimCheckLedgerWriter = (input: {
-  readonly subject: { readonly sha256: string; readonly format: string };
-  readonly claims: readonly ClaimRecord[];
-  readonly validator: { readonly id: string; readonly version: string };
-}): ClaimCheckLedgerWriter => {
-  const { subject, validator } = input;
-  const claimsByKey = new Map<string, ClaimRecord>();
-  const dependentsByClaimId = new Map<string, ClaimRecord[]>();
-  for (const claim of input.claims) {
+/** Registered claims by identity key, with their dependents, for one writer. */
+interface ClaimRegistry {
+  readonly byKey: ReadonlyMap<string, LedgerClaim>;
+  readonly dependentsByClaimId: ReadonlyMap<string, readonly LedgerClaim[]>;
+  readonly normalize: (claim: ClaimRecord | RuntimeClaimRecord) => LedgerClaim;
+}
+
+const registerClaims = (
+  claims: readonly (ClaimRecord | RuntimeClaimRecord)[],
+  subject: { readonly sha256: string; readonly format: string },
+): ClaimRegistry => {
+  const byKey = new Map<string, LedgerClaim>();
+  const dependentsByClaimId = new Map<string, LedgerClaim[]>();
+  // Registration identity is by object reference, as the string-only writer
+  // enforced: the normalized view of a claim object is computed once, and an
+  // append is accepted only for the very object that was registered.
+  const normalizedByClaim = new WeakMap<object, LedgerClaim>();
+  const normalize = (
+    rawClaim: ClaimRecord | RuntimeClaimRecord,
+  ): LedgerClaim => {
+    let normalized = normalizedByClaim.get(rawClaim);
+    if (normalized === undefined) {
+      normalized = normalizeClaimShape(rawClaim);
+      normalizedByClaim.set(rawClaim, normalized);
+    }
+    return normalized;
+  };
+  for (const rawClaim of claims) {
+    const claim = normalize(rawClaim);
     if (
       claim.subject.sha256 !== subject.sha256 ||
       claim.subject.format !== subject.format
@@ -349,7 +423,7 @@ export const createClaimCheckLedgerWriter = (input: {
       throw new TypeError(
         "Claim-check ledger writer refuses claims for a different subject",
       );
-    claimsByKey.set(`${claim.claim_id}@${claim.claim_version}`, claim);
+    byKey.set(`${claim.claim_id}@${claim.claim_version}`, claim);
     for (const dependency of claim.dependencies) {
       const dependents = dependentsByClaimId.get(dependency) ?? [];
       dependents.push(claim);
@@ -362,6 +436,19 @@ export const createClaimCheckLedgerWriter = (input: {
         compareAsciiStrings(left.claim_id, right.claim_id) ||
         compareAsciiStrings(left.claim_version, right.claim_version),
     );
+  return { byKey, dependentsByClaimId, normalize };
+};
+
+export const createClaimCheckLedgerWriter = (input: {
+  readonly subject: { readonly sha256: string; readonly format: string };
+  readonly claims: readonly (ClaimRecord | RuntimeClaimRecord)[];
+  readonly validator: { readonly id: string; readonly version: string };
+}): ClaimCheckLedgerWriter => {
+  const { subject, validator } = input;
+  const registry = registerClaims(input.claims, subject);
+  const claimsByKey = registry.byKey;
+  const dependentsByClaimId = registry.dependentsByClaimId;
+  const normalizeClaim = registry.normalize;
 
   const entries: ClaimCheckLedgerEntry[] = [];
   const adjudicatedKeys = new Set<string>();
@@ -390,9 +477,13 @@ export const createClaimCheckLedgerWriter = (input: {
     });
 
   return {
-    appendAdjudication(claim, verdict) {
+    appendAdjudication(
+      rawClaim: ClaimRecord | RuntimeClaimRecord,
+      verdict: LedgerVerdict,
+    ) {
       if (committed)
         throw new TypeError("Cannot append to a committed claim-check ledger");
+      const claim = normalizeClaim(rawClaim);
       const key = `${claim.claim_id}@${claim.claim_version}`;
       if (claimsByKey.get(key) !== claim)
         throw new TypeError(
@@ -412,7 +503,7 @@ export const createClaimCheckLedgerWriter = (input: {
         ...(verdict.observed === undefined
           ? {}
           : { observed: verdict.observed }),
-        evidence_refs: [claim.evidence_ref],
+        evidence_refs: [...claim.evidence_refs],
       });
       if (verdict.state === "refuted") {
         for (const dependent of dependentsByClaimId.get(claim.claim_id) ?? []) {

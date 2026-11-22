@@ -11,6 +11,7 @@ import {
   importEvidenceBundleCommand,
 } from "./application/EvidenceBundleCommands.js";
 import { runClaimCheckCommand } from "./application/claimCheck/runClaimCheck.js";
+import { runRuntimeClaimCheckCommand } from "./application/claimCheck/runRuntimeClaimCheck.js";
 import { logCliCommand } from "./cliLogging.js";
 import type { Logger } from "pino";
 import { CLI_COMMANDS } from "./cliCommandNames.js";
@@ -82,6 +83,31 @@ export const registerEvidenceCommands = (
             {
               evidencePath: args.evidence,
               artifactPath: args.artifact,
+              ledgerPath: args.ledger,
+            },
+            signal,
+          );
+          return ran.ok ? ran.value : cliError(ran.error);
+        }),
+      ),
+  });
+  cli.command(CLI_COMMANDS.claimCheckRuntime, {
+    description:
+      "Adjudicate runtime string claims from execute_dynamically Evidence by replay recurrence across at least three runs per stimulus; writes a hash-chained claim-check ledger",
+    args: z.object({
+      evidence: localPathStringSchema.describe(
+        "Evidence JSON path (one execute_dynamically record or an array of records)",
+      ),
+      ledger: localPathStringSchema.describe(
+        "Claim-check ledger JSON output path",
+      ),
+    }),
+    run: ({ args }) =>
+      withCommandCancellation((signal) =>
+        logCliCommand(logger, "claim-check-runtime", async () => {
+          const ran = await runRuntimeClaimCheckCommand(
+            {
+              evidencePath: args.evidence,
               ledgerPath: args.ledger,
             },
             signal,
