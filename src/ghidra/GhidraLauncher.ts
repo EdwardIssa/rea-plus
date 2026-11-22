@@ -58,10 +58,8 @@ import {
   inspectGhidraPspExtension,
   type GhidraPspExtension,
 } from "./GhidraPspExtension.js";
-import {
-  GhidraWorkerSupervisor,
-  resolveGhidraWorkerRssCap,
-} from "./GhidraWorkerSupervisor.js";
+import { WorkerSupervisor } from "../process/WorkerSupervisor.js";
+import { resolveGhidraWorkerRssCap } from "./GhidraWorkerSupervisor.js";
 
 export interface GhidraLaunchSession {
   readonly runtimeRoot: string;
@@ -88,7 +86,7 @@ export type GhidraLaunch = ProviderProcessLaunch & {
    * whose process handle supports exit observation. Its outcome names why
    * the worker settled (deadline, memory, exited, crashed, stopped).
    */
-  readonly supervisor?: GhidraWorkerSupervisor;
+  readonly supervisor?: WorkerSupervisor;
 };
 
 /** Same per-stream projection budget for helper warnings and failed commands. */
@@ -732,7 +730,7 @@ const supervisedGhidraLaunch = (input: {
       : { launchSupport: [...launchSupport] }),
   };
   if (typeof spawned.process.once !== "function") return launch;
-  const supervisor = new GhidraWorkerSupervisor(spawned.process, {
+  const supervisor = new WorkerSupervisor(spawned.process, {
     rssCapBytes: resolveGhidraWorkerRssCap(
       configuredMaxHeap === undefined ? {} : { configuredMaxHeap },
     ),

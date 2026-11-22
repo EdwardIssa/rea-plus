@@ -1,10 +1,12 @@
 /**
- * Pre-registered Frida hook pack for the dynamic-execution ablation
- * (spec section 2). Versioned; the version is recorded in every run record.
- * No target-specific hooks. Hooks: puts/fputs argument capture, printf-family
- * format capture, write() stream capture on fd 1/2 (the rendered output the
- * stdio hooks feed), dlopen/dlsym observation, exit/_exit observation.
- * Frida 17 API: Module.getGlobalExportByName (getExportByName was removed).
+ * The shipped Frida hook pack for dynamic execution: a versioned product
+ * asset in the provider-adapter layer. Moved byte-identical from the
+ * ablation harness (scripts/ablation/hookPack.mjs) at version 1.1.0; the
+ * version bumps only when hook behavior changes. No target-specific hooks.
+ * Hooks: puts/fputs argument capture, printf-family format capture, write()
+ * stream capture on fd 1/2 (the rendered output the stdio hooks feed),
+ * dlopen/dlsym observation, exit/_exit observation. Frida 17 API:
+ * Module.getGlobalExportByName (getExportByName was removed).
  */
 export const HOOK_PACK_VERSION = "1.1.0";
 

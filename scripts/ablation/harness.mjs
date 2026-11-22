@@ -2,7 +2,7 @@
  * Isolation harness for the dynamic-execution ablation: runs the dynamic
  * worker (or a plain fixture, for fidelity checks) inside the measured
  * namespace contract (user + net + mount, NO pid namespace — feasibility
- * section 3) under the repo's GhidraWorkerSupervisor (process-tree RSS cap +
+ * section 3) under the repo's WorkerSupervisor (process-tree RSS cap +
  * deadline, /proc accounting), with a termination cascade (process-group
  * SIGKILL + /proc parentage descendant sweep + target-exe sweep) and a
  * post-run survivor verification. Only repo-authored fixtures are ever run
@@ -22,7 +22,7 @@ import {
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { GhidraWorkerSupervisor } from "../../dist/ghidra/GhidraWorkerSupervisor.js";
+import { WorkerSupervisor } from "../../dist/process/WorkerSupervisor.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const WORKER_PATH = join(HERE, "dynamicWorker.mjs");
@@ -141,7 +141,7 @@ const runSupervised = async ({
     ],
     { detached: true, stdio: ["ignore", stdoutFd, stderrFd], env },
   );
-  const supervisor = new GhidraWorkerSupervisor(child, {
+  const supervisor = new WorkerSupervisor(child, {
     rssCapBytes,
     deadlineMs,
     pollIntervalMs: 200,

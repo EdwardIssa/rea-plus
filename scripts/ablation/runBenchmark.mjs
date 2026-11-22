@@ -18,7 +18,10 @@ import { fileURLToPath } from "node:url";
 import { candidateEdges, dynamicClaims, staticClaims } from "./claims.mjs";
 import { readElfMetadata } from "./elfFacts.mjs";
 import { runDynamicJob, runPlainJob } from "./harness.mjs";
-import { HOOK_PACK_SOURCE, HOOK_PACK_VERSION } from "./hookPack.mjs";
+import {
+  HOOK_PACK_SOURCE,
+  HOOK_PACK_VERSION,
+} from "../../dist/frida/hookPack.js";
 import {
   buildFixtures,
   FIXTURES_ROOT,

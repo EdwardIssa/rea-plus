@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 
-import { readProcessTreeRssBytes } from "../../dist/ghidra/GhidraWorkerSupervisor.js";
+import { readProcessTreeRssBytes } from "../../dist/process/WorkerSupervisor.js";
 import { descendantsOf } from "./harness.mjs";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
