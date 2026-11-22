@@ -25,6 +25,7 @@ import {
   extractStringClaims,
   isStringEvidence,
 } from "./extractStringClaims.js";
+import { deriveClaimRelocations } from "./deriveClaimRelocations.js";
 import {
   createElfBytePort,
   openArtifactRangeReader,
@@ -198,10 +199,29 @@ export const runClaimCheck = async (
         compareAsciiStrings(left.claim_version, right.claim_version),
     );
 
-    const port =
-      subject.format === "elf"
-        ? await createElfBytePort(reader)
-        : unsupportedFormatPort();
+    // Address meaning is per producer: a producer whose own Evidence in
+    // this set records the image base it loaded the artifact at gets a
+    // byte port that applies that recorded relocation; every other
+    // producer's claims keep raw address semantics.
+    const relocations = deriveClaimRelocations(
+      authenticated.value,
+      subject.sha256,
+    );
+    const ports = new Map<string, Promise<StringClaimBytePort>>();
+    const portFor = (providerId: string): Promise<StringClaimBytePort> => {
+      if (subject.format !== "elf")
+        return Promise.resolve(unsupportedFormatPort());
+      let pending = ports.get(providerId);
+      if (pending === undefined) {
+        const relocation = relocations.get(providerId);
+        pending = createElfBytePort(
+          reader,
+          relocation === undefined ? {} : { relocation },
+        );
+        ports.set(providerId, pending);
+      }
+      return pending;
+    };
     const writer = createClaimCheckLedgerWriter({
       subject,
       claims: ordered,
@@ -209,7 +229,10 @@ export const runClaimCheck = async (
     });
     for (const claim of ordered) {
       signal?.throwIfAborted();
-      const verdict = await validateStringClaim(claim, port);
+      const verdict = await validateStringClaim(
+        claim,
+        await portFor(claim.producer.provider_id),
+      );
       writer.appendAdjudication(claim, verdict);
     }
     const ledger: ClaimCheckLedger = writer.commitRun(

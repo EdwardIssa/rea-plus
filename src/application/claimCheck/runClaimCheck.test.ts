@@ -12,7 +12,12 @@ import {
 } from "../../domain/claimCheck/claimCheckLedger.js";
 import { createEvidence, type Evidence } from "../../domain/evidence.js";
 import { runClaimCheck } from "./runClaimCheck.js";
-import { buildSyntheticElf, SYNTHETIC_ELF } from "./syntheticElf.fixture.js";
+import {
+  buildSyntheticDynElf,
+  buildSyntheticElf,
+  SYNTHETIC_DYN_ELF,
+  SYNTHETIC_ELF,
+} from "./syntheticElf.fixture.js";
 
 const provider = { id: "ghidra", name: "Ghidra", version: "12.1.4" };
 
@@ -294,6 +299,178 @@ describe("claim-check run", () => {
       if (!result.ok) throw result.error;
       expect(result.value.counts.supported).toBe(0);
       expect(result.value.counts.refuted).toBe(2);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+/** A string row in the Ghidra bridge's emitted shape: no decoding key, no
+ * encoding_status, charset spelled as the engine reports it. */
+const ghidraRow = (address: string, value: string, byteLength: number) => ({
+  address,
+  value,
+  string: {
+    encoding: "UTF-8",
+    termination: "present_or_not_required",
+    byte_length: byteLength,
+  },
+});
+
+const dynRows = (): readonly unknown[] => [
+  ghidraRow(
+    SYNTHETIC_DYN_ELF.alpha.address,
+    SYNTHETIC_DYN_ELF.alpha.value,
+    SYNTHETIC_DYN_ELF.alpha.byteLength,
+  ),
+  ghidraRow(
+    SYNTHETIC_DYN_ELF.beta.address,
+    SYNTHETIC_DYN_ELF.beta.value,
+    SYNTHETIC_DYN_ELF.beta.byteLength,
+  ),
+  ghidraRow(
+    SYNTHETIC_DYN_ELF.table.address,
+    SYNTHETIC_DYN_ELF.table.value,
+    SYNTHETIC_DYN_ELF.table.byteLength,
+  ),
+];
+
+const overviewFor = (sha256: string): Evidence =>
+  createEvidence(
+    { path: "/fixtures/artifact", sha256, format: "elf" },
+    provider,
+    {
+      operation: "read_binary_inventory_summary",
+      parameters: {},
+      result: {
+        document: "fixture.elf",
+        image_base: SYNTHETIC_DYN_ELF.imageBase,
+        segments: [],
+        procedure_count: 0,
+        string_count: 3,
+      },
+      evidenceLinks: [],
+    },
+  );
+
+describe("claim-check run (Ghidra producer interop)", () => {
+  const setupDyn = async (): Promise<{
+    root: string;
+    artifactPath: string;
+    sha256: string;
+  }> => {
+    const root = await mkdtemp(join(tmpdir(), "rea-claim-check-dyn-"));
+    const artifactPath = join(root, "fixture-dyn.elf");
+    const { bytes, sha256 } = buildSyntheticDynElf();
+    await writeFile(artifactPath, bytes);
+    return { root, artifactPath, sha256 };
+  };
+
+  it("supports relocated and section-space claims with recorded context", async () => {
+    const { root, artifactPath, sha256 } = await setupDyn();
+    try {
+      const result = await runClaimCheck({
+        evidence: [evidenceFor(sha256, dynRows()), overviewFor(sha256)],
+        artifactPath,
+      });
+      if (!result.ok) throw result.error;
+      expect(result.value.counts).toEqual({
+        supported: 3,
+        refuted: 0,
+        unknown: 0,
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("supports relocated claims from a composed overview record", async () => {
+    const { root, artifactPath, sha256 } = await setupDyn();
+    try {
+      // The session's binary_overview Evidence is recorded by the composed
+      // workflow layer, not the engine provider; its recorded base still
+      // describes the one session behind the set.
+      const composed = createEvidence(
+        { path: "/fixtures/artifact", sha256, format: "elf" },
+        {
+          id: "rea-workflow",
+          name: "REA composed investigation workflow",
+          version: "1",
+        },
+        {
+          operation: "binary_overview",
+          parameters: {},
+          result: {
+            document: "fixture.elf",
+            image_base: SYNTHETIC_DYN_ELF.imageBase,
+            segments: [],
+            procedure_count: 0,
+            string_count: 3,
+          },
+          evidenceLinks: [],
+        },
+      );
+      const result = await runClaimCheck({
+        evidence: [evidenceFor(sha256, dynRows()), composed],
+        artifactPath,
+      });
+      if (!result.ok) throw result.error;
+      expect(result.value.counts).toEqual({
+        supported: 3,
+        refuted: 0,
+        unknown: 0,
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("returns relocated claims to unknown when the context record is removed", async () => {
+    const { root, artifactPath, sha256 } = await setupDyn();
+    try {
+      const result = await runClaimCheck({
+        evidence: [evidenceFor(sha256, dynRows())],
+        artifactPath,
+      });
+      if (!result.ok) throw result.error;
+      // The section-space claim still resolves from the artifact's own
+      // headers; the two relocated claims have no recorded base and must
+      // not be guessed into support.
+      expect(result.value.counts).toEqual({
+        supported: 1,
+        refuted: 0,
+        unknown: 2,
+      });
+      const reasons = result.value.ledger.entries
+        .filter((entry) => entry.kind === "adjudication")
+        .map((entry) => entry.reason)
+        .sort();
+      expect(reasons).toEqual([
+        "address_unmapped",
+        "address_unmapped",
+        "bytes_match",
+      ]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("never supports a relocated claim whose address was shifted by one", async () => {
+    const { root, artifactPath, sha256 } = await setupDyn();
+    try {
+      const rows = dynRows().map((row, index) =>
+        index === 0 ? { ...(row as object), address: "0x101101" } : row,
+      );
+      const result = await runClaimCheck({
+        evidence: [evidenceFor(sha256, rows), overviewFor(sha256)],
+        artifactPath,
+      });
+      if (!result.ok) throw result.error;
+      expect(result.value.counts).toEqual({
+        supported: 2,
+        refuted: 1,
+        unknown: 0,
+      });
     } finally {
       await rm(root, { recursive: true, force: true });
     }

@@ -1,0 +1,1304 @@
+[
+  {
+    "evidence_id": "ev_1dbe7a0795da98732fd1fc611b13f6e5a3c10cf2697918c89332d5508b46d627",
+    "subject": {
+      "name": "fixture_basic",
+      "digest": {
+        "sha256": "ac8a55ebfc405a26fbd6971d9cc8d9c2c6069c7d1621265cbfe2625847f99a45"
+      },
+      "local_path": "/home/hatch/workspace/ghidra-fixtures/fixture_basic",
+      "format": "elf",
+      "architecture": "x86_64"
+    },
+    "provider": {
+      "id": "rea-workflow",
+      "name": "REA composed investigation workflow",
+      "version": "1"
+    },
+    "analysis_profile": {
+      "provider": {
+        "id": "rea-workflow",
+        "name": "REA composed investigation workflow",
+        "version": "1"
+      },
+      "parameters": {
+        "upstream_analysis_profile": {
+          "provider": {
+            "id": "ghidra",
+            "name": "Ghidra",
+            "version": "12.1.4"
+          },
+          "parameters": {
+            "target_kind": "executable",
+            "target_format": "elf",
+            "architecture": "x86_64",
+            "available_architectures": ["x86_64"],
+            "import_mode": "ephemeral-source-immutable",
+            "annotation_policy": "atomic-function-entry-metadata-v1",
+            "byte_search_boundary": "contiguous-eligible-initialized-blocks-v1",
+            "load_image_observations": "source-mappings-entry-context-relocation-symbol-v3",
+            "function_body_evidence": "complete-inclusive-ranges-v1",
+            "function_references": "complete-body-and-entry-reference-manager-v3",
+            "call_relationship_coverage": "function-body-call-coverage-v5",
+            "function_dossier_coverage": "observed-facets-and-call-relationships-v1",
+            "string_inventory_evidence": "defined-data-coverage-v1",
+            "data_type_observations": "bit-field-base-and-lookup-v1",
+            "location_resolution": "explicit-address-exact-entry-symbol-first-v3",
+            "procedure_search": "primary-and-exact-entry-symbol-names-v1",
+            "procedure_file_offset_resolution": "address-first-unique-target-source-mapping-v2",
+            "instruction_flow_evidence": "decoded-return-pcode-v1",
+            "instruction_status": "unlisted-address-without-decode-v1",
+            "instruction_references": "exact-address-incoming-without-synthetic-entry-v3",
+            "function_boundary_observations": "ghidra-function-boundary-limitations-v4",
+            "no_return_repair": "returning-imports-decoded-return-v2",
+            "process_launch": "inspected-jvm-launch-support-v1",
+            "jump_table_evidence": "typed-case-default-blocks-v1",
+            "decompiler_jump_loads": true,
+            "loader": "auto-from-header",
+            "language_id": "auto-from-header",
+            "compiler_spec_id": "auto-default",
+            "analyzer_preset": "ghidra-default",
+            "function_coordinate_context": {
+              "kind": "native-function-coordinate-context-v1",
+              "selected_image": null,
+              "mapping_sha256": "55a7964dc0bcdf067484a281c658e6ca8457a49405e0ea9dbd080366ee4c3198"
+            }
+          },
+          "digest": "bd195d27d1340444732d2370726f2cc5c6f02722b061ef3880b4cc85008f076a"
+        },
+        "source_limitations": "provider-operation-caveats-v1",
+        "workflow_revision": 5
+      },
+      "digest": "c2ad23a3faef440b2e790410d40d3a4ca95090b89f4e11b67f922eee40e1f074"
+    },
+    "predicate_type": "rea.analysis",
+    "operation": "binary_overview",
+    "parameters": {},
+    "raw_result": null,
+    "normalized_result": {
+      "document": "target-ac8a55ebfc40.bin",
+      "image_base": "0x100000",
+      "segments": [
+        {
+          "name": "segment_2.1",
+          "start": "0x100000",
+          "end": "0x100318",
+          "length": 792,
+          "image_base": "0x100000",
+          "address_space": "ram"
+        },
+        {
+          "name": ".interp",
+          "start": "0x100318",
+          "end": "0x100334",
+          "length": 28,
+          "image_base": "0x100000",
+          "address_space": "ram"
+        },
+        {
+          "name": ".note.gnu.property",
+          "start": "0x100338",
+          "end": "0x100368",
+          "length": 48,
+          "image_base": "0x100000",
+          "address_space": "ram"
+        },
+        {
+          "name": ".note.gnu.build-id",
+          "start": "0x100368",
+          "end": "0x10038c",
+          "length": 36,
+          "image_base": "0x100000",
+          "address_space": "ram"
+        },
+        {
+          "name": ".note.ABI-tag",
+          "start": "0x10038c",
+          "end": "0x1003ac",
+          "length": 32,
+          "image_base": "0x100000",
+          "address_space": "ram"
+        },
+        {
+          "name": ".gnu.hash",
+          "start": "0x1003b0",
+          "end": "0x1003d4",
+          "length": 36,
+          "image_base": "0x100000",
+          "address_space": "ram"
+        },
+        {
+          "name": ".dynsym",
+          "start": "0x1003d8",
+          "end": "0x100480",
+          "length": 168,
+          "image_base": "0x100000",
+          "address_space": "ram"
+        },
+        {
+          "name": ".dynstr",
+          "start": "0x100480",
+          "end": "0x10050f",
+          "length": 143,
+          "image_base": "0x100000",
+          "address_space": "ram"
+        },
+        {
+          "name": ".gnu.version",
+          "start": "0x100510",
+          "end": "0x10051e",
+          "length": 14,
+          "image_base": "0x100000",
+          "address_space": "ram"
+        },
+        {
+          "name": ".gnu.version_r",
+          "start": "0x100520",
+          "end": "0x100550",
+          "length": 48,
+          "image_base": "0x100000",
+          "address_space": "ram"
+        },
+        {
+          "name": ".rela.dyn",
+          "start": "0x100550",
+          "end": "0x100640",
+          "length": 240,
+          "image_base": "0x100000",
+          "address_space": "ram"
+        },
+        {
+          "name": ".rela.plt",
+          "start": "0x100640",
+          "end": "0x100658",
+          "length": 24,
+          "image_base": "0x100000",
+          "address_space": "ram"
+        },
+        {
+          "name": ".init",
+          "start": "0x101000",
+          "end": "0x10101b",
+          "length": 27,
+          "image_base": "0x100000",
+          "address_space": "ram"
+        },
+        {
+          "name": ".plt",
+          "start": "0x101020",
+          "end": "0x101040",
+          "length": 32,
+          "image_base": "0x100000",
+          "address_space": "ram"
+        },
+        {
+          "name": ".plt.got",
+          "start": "0x101040",
+          "end": "0x101050",
+          "length": 16,
+          "image_base": "0x100000",
+          "address_space": "ram"
+        },
+        {
+          "name": ".plt.sec",
+          "start": "0x101050",
+          "end": "0x101060",
+          "length": 16,
+          "image_base": "0x100000",
+          "address_space": "ram"
+        },
+        {
+          "name": ".text",
+          "start": "0x101060",
+          "end": "0x10125b",
+          "length": 507,
+          "image_base": "0x100000",
+          "address_space": "ram"
+        },
+        {
+          "name": ".fini",
+          "start": "0x10125c",
+          "end": "0x101269",
+          "length": 13,
+          "image_base": "0x100000",
+          "address_space": "ram"
+        },
+        {
+          "name": ".rodata",
+          "start": "0x102000",
+          "end": "0x10206f",
+          "length": 111,
+          "image_base": "0x100000",
+          "address_space": "ram"
+        },
+        {
+          "name": ".eh_frame_hdr",
+          "start": "0x102070",
+          "end": "0x1020c4",
+          "length": 84,
+          "image_base": "0x100000",
+          "address_space": "ram"
+        },
+        {
+          "name": ".eh_frame",
+          "start": "0x1020c8",
+          "end": "0x1021f4",
+          "length": 300,
+          "image_base": "0x100000",
+          "address_space": "ram"
+        },
+        {
+          "name": ".init_array",
+          "start": "0x103db8",
+          "end": "0x103dc0",
+          "length": 8,
+          "image_base": "0x100000",
+          "address_space": "ram"
+        },
+        {
+          "name": ".fini_array",
+          "start": "0x103dc0",
+          "end": "0x103dc8",
+          "length": 8,
+          "image_base": "0x100000",
+          "address_space": "ram"
+        },
+        {
+          "name": ".dynamic",
+          "start": "0x103dc8",
+          "end": "0x103fb8",
+          "length": 496,
+          "image_base": "0x100000",
+          "address_space": "ram"
+        },
+        {
+          "name": ".got",
+          "start": "0x103fb8",
+          "end": "0x104000",
+          "length": 72,
+          "image_base": "0x100000",
+          "address_space": "ram"
+        },
+        {
+          "name": ".data",
+          "start": "0x104000",
+          "end": "0x104020",
+          "length": 32,
+          "image_base": "0x100000",
+          "address_space": "ram"
+        },
+        {
+          "name": ".bss",
+          "start": "0x104020",
+          "end": "0x104028",
+          "length": 8,
+          "image_base": "0x100000",
+          "address_space": "ram"
+        },
+        {
+          "name": "EXTERNAL",
+          "start": "0x105000",
+          "end": "0x105030",
+          "length": 48,
+          "image_base": "0x100000",
+          "address_space": "ram"
+        },
+        {
+          "name": ".comment",
+          "start": ".comment:0x0",
+          "end": ".comment:0x2d",
+          "length": 45,
+          "image_base": "0x100000",
+          "address_space": ".comment"
+        },
+        {
+          "name": ".debug_abbrev",
+          "start": ".debug_abbrev:0x0",
+          "end": ".debug_abbrev:0x106",
+          "length": 262,
+          "image_base": "0x100000",
+          "address_space": ".debug_abbrev"
+        },
+        {
+          "name": ".debug_aranges",
+          "start": ".debug_aranges:0x0",
+          "end": ".debug_aranges:0x30",
+          "length": 48,
+          "image_base": "0x100000",
+          "address_space": ".debug_aranges"
+        },
+        {
+          "name": ".debug_info",
+          "start": ".debug_info:0x0",
+          "end": ".debug_info:0x1f9",
+          "length": 505,
+          "image_base": "0x100000",
+          "address_space": ".debug_info"
+        },
+        {
+          "name": ".debug_line",
+          "start": ".debug_line:0x0",
+          "end": ".debug_line:0xab",
+          "length": 171,
+          "image_base": "0x100000",
+          "address_space": ".debug_line"
+        },
+        {
+          "name": ".debug_line_str",
+          "start": ".debug_line_str:0x0",
+          "end": ".debug_line_str:0x36",
+          "length": 54,
+          "image_base": "0x100000",
+          "address_space": ".debug_line_str"
+        },
+        {
+          "name": ".debug_str",
+          "start": ".debug_str:0x0",
+          "end": ".debug_str:0x144",
+          "length": 324,
+          "image_base": "0x100000",
+          "address_space": ".debug_str"
+        },
+        {
+          "name": ".shstrtab",
+          "start": ".shstrtab:0x0",
+          "end": ".shstrtab:0x16a",
+          "length": 362,
+          "image_base": "0x100000",
+          "address_space": ".shstrtab"
+        },
+        {
+          "name": ".strtab",
+          "start": ".strtab:0x0",
+          "end": ".strtab:0x226",
+          "length": 550,
+          "image_base": "0x100000",
+          "address_space": ".strtab"
+        },
+        {
+          "name": ".symtab",
+          "start": ".symtab:0x0",
+          "end": ".symtab:0x3f0",
+          "length": 1008,
+          "image_base": "0x100000",
+          "address_space": ".symtab"
+        },
+        {
+          "name": "_elfSectionHeaders",
+          "start": "_elfSectionHeaders:0x0",
+          "end": "_elfSectionHeaders:0x940",
+          "length": 2368,
+          "image_base": "0x100000",
+          "address_space": "_elfSectionHeaders"
+        }
+      ],
+      "segment_count": 39,
+      "procedure_count": 27,
+      "string_count": 89,
+      "inventory_coverage": {
+        "scope": "provider_inventory",
+        "discovery_coverage": "unknown"
+      }
+    },
+    "confidence": "derived",
+    "authority": "shipped-artifact",
+    "environment": null,
+    "limitations": [
+      "Derived by an REA composed workflow.",
+      "Ghidra (ghidra 12.1.4) read_binary_inventory_summary: Cancelling an active Ghidra request terminates its ephemeral database and discards session annotations. The selected target remains open; the next provider query imports the original artifact again.",
+      "Ghidra (ghidra 12.1.4) read_binary_inventory_summary: Counts use the complete defined-string inventory and the same local/external function inventory as list_strings and list_procedures. They do not establish discovery of undefined strings or unidentified functions.",
+      "Ghidra (ghidra 12.1.4) read_binary_inventory_summary: Default-space addresses use lowercase 0x-prefixed hexadecimal; other address spaces use <percent-encoded-space>:0x<hex>.",
+      "Ghidra (ghidra 12.1.4) read_binary_inventory_summary: Memory-block end addresses are exclusive; segment lengths use those observed address coordinates.",
+      "Ghidra (ghidra 12.1.4) read_binary_inventory_summary: Only Ghidra-defined string Data is observed; packed or undefined string bytes may be absent. Completeness applies to that inventory, and an empty search does not establish that text is absent from the artifact. If an address is known, use read_bytes and xrefs to inspect bytes and references.",
+      "Ghidra (ghidra 12.1.4) read_binary_inventory_summary: The imported Program and temporary project are ephemeral and deleted on close. Annotation operations edit session database metadata; original executable bytes are never written.",
+      "Ghidra (ghidra 12.1.4) read_binary_inventory_summary: The session serves operations only after Ghidra reports default auto-analysis complete; incomplete analysis does not expose partial results."
+    ],
+    "relationship_coverage": null,
+    "locations": [],
+    "evidence_links": [
+      "ev_53918156ab281ea25de3b51bd0c44a84dae39e41f2a776fb2241e3a08959b87d"
+    ]
+  },
+  {
+    "evidence_id": "ev_895df553e49d5758d044916a0fd8e595eee4ae9940986a85cfc41bd9fa55da1c",
+    "subject": {
+      "name": "fixture_basic",
+      "digest": {
+        "sha256": "ac8a55ebfc405a26fbd6971d9cc8d9c2c6069c7d1621265cbfe2625847f99a45"
+      },
+      "local_path": "/home/hatch/workspace/ghidra-fixtures/fixture_basic",
+      "format": "elf",
+      "architecture": "x86_64"
+    },
+    "provider": {
+      "id": "ghidra",
+      "name": "Ghidra",
+      "version": "12.1.4"
+    },
+    "analysis_profile": {
+      "provider": {
+        "id": "ghidra",
+        "name": "Ghidra",
+        "version": "12.1.4"
+      },
+      "parameters": {
+        "target_kind": "executable",
+        "target_format": "elf",
+        "architecture": "x86_64",
+        "available_architectures": ["x86_64"],
+        "import_mode": "ephemeral-source-immutable",
+        "annotation_policy": "atomic-function-entry-metadata-v1",
+        "byte_search_boundary": "contiguous-eligible-initialized-blocks-v1",
+        "load_image_observations": "source-mappings-entry-context-relocation-symbol-v3",
+        "function_body_evidence": "complete-inclusive-ranges-v1",
+        "function_references": "complete-body-and-entry-reference-manager-v3",
+        "call_relationship_coverage": "function-body-call-coverage-v5",
+        "function_dossier_coverage": "observed-facets-and-call-relationships-v1",
+        "string_inventory_evidence": "defined-data-coverage-v1",
+        "data_type_observations": "bit-field-base-and-lookup-v1",
+        "location_resolution": "explicit-address-exact-entry-symbol-first-v3",
+        "procedure_search": "primary-and-exact-entry-symbol-names-v1",
+        "procedure_file_offset_resolution": "address-first-unique-target-source-mapping-v2",
+        "instruction_flow_evidence": "decoded-return-pcode-v1",
+        "instruction_status": "unlisted-address-without-decode-v1",
+        "instruction_references": "exact-address-incoming-without-synthetic-entry-v3",
+        "function_boundary_observations": "ghidra-function-boundary-limitations-v4",
+        "no_return_repair": "returning-imports-decoded-return-v2",
+        "process_launch": "inspected-jvm-launch-support-v1",
+        "jump_table_evidence": "typed-case-default-blocks-v1",
+        "decompiler_jump_loads": true,
+        "loader": "auto-from-header",
+        "language_id": "auto-from-header",
+        "compiler_spec_id": "auto-default",
+        "analyzer_preset": "ghidra-default",
+        "function_coordinate_context": {
+          "kind": "native-function-coordinate-context-v1",
+          "selected_image": null,
+          "mapping_sha256": "55a7964dc0bcdf067484a281c658e6ca8457a49405e0ea9dbd080366ee4c3198"
+        }
+      },
+      "digest": "bd195d27d1340444732d2370726f2cc5c6f02722b061ef3880b4cc85008f076a"
+    },
+    "predicate_type": "rea.analysis",
+    "operation": "list_strings",
+    "parameters": {},
+    "raw_result": null,
+    "normalized_result": [
+      {
+        "address": "0x100318",
+        "value": "/lib64/ld-linux-x86-64.so.2",
+        "string": {
+          "encoding": "US-ASCII",
+          "termination": "present_or_not_required",
+          "byte_length": 28
+        }
+      },
+      {
+        "address": "0x100481",
+        "value": "__libc_start_main",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 18
+        }
+      },
+      {
+        "address": "0x100493",
+        "value": "__cxa_finalize",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 15
+        }
+      },
+      {
+        "address": "0x1004a2",
+        "value": "printf",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 7
+        }
+      },
+      {
+        "address": "0x1004a9",
+        "value": "libc.so.6",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 10
+        }
+      },
+      {
+        "address": "0x1004b3",
+        "value": "GLIBC_2.2.5",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 12
+        }
+      },
+      {
+        "address": "0x1004bf",
+        "value": "GLIBC_2.34",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 11
+        }
+      },
+      {
+        "address": "0x1004ca",
+        "value": "_ITM_deregisterTMCloneTable",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 28
+        }
+      },
+      {
+        "address": "0x1004e6",
+        "value": "__gmon_start__",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 15
+        }
+      },
+      {
+        "address": "0x1004f5",
+        "value": "_ITM_registerTMCloneTable",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 26
+        }
+      },
+      {
+        "address": "0x102008",
+        "value": "rea-ghidra-fixture-greeting-7f3a",
+        "string": {
+          "encoding": "US-ASCII",
+          "termination": "present_or_not_required",
+          "byte_length": 33
+        }
+      },
+      {
+        "address": "0x102030",
+        "value": "rea-ghidra-fixture-farewell-91bc",
+        "string": {
+          "encoding": "US-ASCII",
+          "termination": "present_or_not_required",
+          "byte_length": 33
+        }
+      },
+      {
+        "address": "0x102051",
+        "value": "%s, %s!\n",
+        "string": {
+          "encoding": "US-ASCII",
+          "termination": "present_or_not_required",
+          "byte_length": 9
+        }
+      },
+      {
+        "address": "0x10205a",
+        "value": "analyst",
+        "string": {
+          "encoding": "US-ASCII",
+          "termination": "present_or_not_required",
+          "byte_length": 8
+        }
+      },
+      {
+        "address": "0x102062",
+        "value": "score=%d %s\n",
+        "string": {
+          "encoding": "US-ASCII",
+          "termination": "present_or_not_required",
+          "byte_length": 13
+        }
+      },
+      {
+        "address": "0x1020d1",
+        "value": "zR",
+        "string": {
+          "encoding": "US-ASCII",
+          "termination": "present_or_not_required",
+          "byte_length": 3
+        }
+      },
+      {
+        "address": ".comment:0x0",
+        "value": "GCC: (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 45
+        }
+      },
+      {
+        "address": ".debug_line_str:0x0",
+        "value": "/tmp/fixtures.c",
+        "string": {
+          "encoding": "US-ASCII",
+          "termination": "present_or_not_required",
+          "byte_length": 16
+        }
+      },
+      {
+        "address": ".debug_str:0x0",
+        "value": "GREETING",
+        "string": {
+          "encoding": "US-ASCII",
+          "termination": "present_or_not_required",
+          "byte_length": 9
+        }
+      },
+      {
+        "address": ".shstrtab:0x1",
+        "value": ".symtab",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 8
+        }
+      },
+      {
+        "address": ".shstrtab:0x9",
+        "value": ".strtab",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 8
+        }
+      },
+      {
+        "address": ".shstrtab:0x11",
+        "value": ".shstrtab",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 10
+        }
+      },
+      {
+        "address": ".shstrtab:0x1b",
+        "value": ".interp",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 8
+        }
+      },
+      {
+        "address": ".shstrtab:0x23",
+        "value": ".note.gnu.property",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 19
+        }
+      },
+      {
+        "address": ".shstrtab:0x36",
+        "value": ".note.gnu.build-id",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 19
+        }
+      },
+      {
+        "address": ".shstrtab:0x49",
+        "value": ".note.ABI-tag",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 14
+        }
+      },
+      {
+        "address": ".shstrtab:0x57",
+        "value": ".gnu.hash",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 10
+        }
+      },
+      {
+        "address": ".shstrtab:0x61",
+        "value": ".dynsym",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 8
+        }
+      },
+      {
+        "address": ".shstrtab:0x69",
+        "value": ".dynstr",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 8
+        }
+      },
+      {
+        "address": ".shstrtab:0x71",
+        "value": ".gnu.version",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 13
+        }
+      },
+      {
+        "address": ".shstrtab:0x7e",
+        "value": ".gnu.version_r",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 15
+        }
+      },
+      {
+        "address": ".shstrtab:0x8d",
+        "value": ".rela.dyn",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 10
+        }
+      },
+      {
+        "address": ".shstrtab:0x97",
+        "value": ".rela.plt",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 10
+        }
+      },
+      {
+        "address": ".shstrtab:0xa1",
+        "value": ".init",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 6
+        }
+      },
+      {
+        "address": ".shstrtab:0xa7",
+        "value": ".plt.got",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 9
+        }
+      },
+      {
+        "address": ".shstrtab:0xb0",
+        "value": ".plt.sec",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 9
+        }
+      },
+      {
+        "address": ".shstrtab:0xb9",
+        "value": ".text",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 6
+        }
+      },
+      {
+        "address": ".shstrtab:0xbf",
+        "value": ".fini",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 6
+        }
+      },
+      {
+        "address": ".shstrtab:0xc5",
+        "value": ".rodata",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 8
+        }
+      },
+      {
+        "address": ".shstrtab:0xcd",
+        "value": ".eh_frame_hdr",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 14
+        }
+      },
+      {
+        "address": ".shstrtab:0xdb",
+        "value": ".eh_frame",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 10
+        }
+      },
+      {
+        "address": ".shstrtab:0xe5",
+        "value": ".init_array",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 12
+        }
+      },
+      {
+        "address": ".shstrtab:0xf1",
+        "value": ".fini_array",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 12
+        }
+      },
+      {
+        "address": ".shstrtab:0xfd",
+        "value": ".dynamic",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 9
+        }
+      },
+      {
+        "address": ".shstrtab:0x106",
+        "value": ".data",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 6
+        }
+      },
+      {
+        "address": ".shstrtab:0x10c",
+        "value": ".bss",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 5
+        }
+      },
+      {
+        "address": ".shstrtab:0x111",
+        "value": ".comment",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 9
+        }
+      },
+      {
+        "address": ".shstrtab:0x11a",
+        "value": ".debug_aranges",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 15
+        }
+      },
+      {
+        "address": ".shstrtab:0x129",
+        "value": ".debug_info",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 12
+        }
+      },
+      {
+        "address": ".shstrtab:0x135",
+        "value": ".debug_abbrev",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 14
+        }
+      },
+      {
+        "address": ".shstrtab:0x143",
+        "value": ".debug_line",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 12
+        }
+      },
+      {
+        "address": ".shstrtab:0x14f",
+        "value": ".debug_str",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 11
+        }
+      },
+      {
+        "address": ".shstrtab:0x15a",
+        "value": ".debug_line_str",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 16
+        }
+      },
+      {
+        "address": ".strtab:0x1",
+        "value": "Scrt1.o",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 8
+        }
+      },
+      {
+        "address": ".strtab:0x9",
+        "value": "__abi_tag",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 10
+        }
+      },
+      {
+        "address": ".strtab:0x13",
+        "value": "crtstuff.c",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 11
+        }
+      },
+      {
+        "address": ".strtab:0x1e",
+        "value": "deregister_tm_clones",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 21
+        }
+      },
+      {
+        "address": ".strtab:0x33",
+        "value": "__do_global_dtors_aux",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 22
+        }
+      },
+      {
+        "address": ".strtab:0x49",
+        "value": "completed.0",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 12
+        }
+      },
+      {
+        "address": ".strtab:0x55",
+        "value": "__do_global_dtors_aux_fini_array_entry",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 39
+        }
+      },
+      {
+        "address": ".strtab:0x7c",
+        "value": "frame_dummy",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 12
+        }
+      },
+      {
+        "address": ".strtab:0x88",
+        "value": "__frame_dummy_init_array_entry",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 31
+        }
+      },
+      {
+        "address": ".strtab:0xa7",
+        "value": "fixtures.c",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 11
+        }
+      },
+      {
+        "address": ".strtab:0xb2",
+        "value": "GREETING",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 9
+        }
+      },
+      {
+        "address": ".strtab:0xbb",
+        "value": "FAREWELL",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 9
+        }
+      },
+      {
+        "address": ".strtab:0xc4",
+        "value": "__FRAME_END__",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 14
+        }
+      },
+      {
+        "address": ".strtab:0xd2",
+        "value": "_DYNAMIC",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 9
+        }
+      },
+      {
+        "address": ".strtab:0xdb",
+        "value": "__GNU_EH_FRAME_HDR",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 19
+        }
+      },
+      {
+        "address": ".strtab:0xee",
+        "value": "_GLOBAL_OFFSET_TABLE_",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 22
+        }
+      },
+      {
+        "address": ".strtab:0x104",
+        "value": "greet_user",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 11
+        }
+      },
+      {
+        "address": ".strtab:0x10f",
+        "value": "__libc_start_main@GLIBC_2.34",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 29
+        }
+      },
+      {
+        "address": ".strtab:0x12c",
+        "value": "_ITM_deregisterTMCloneTable",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 28
+        }
+      },
+      {
+        "address": ".strtab:0x148",
+        "value": "helper_add",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 11
+        }
+      },
+      {
+        "address": ".strtab:0x153",
+        "value": "_edata",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 7
+        }
+      },
+      {
+        "address": ".strtab:0x15a",
+        "value": "_fini",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 6
+        }
+      },
+      {
+        "address": ".strtab:0x160",
+        "value": "printf@GLIBC_2.2.5",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 19
+        }
+      },
+      {
+        "address": ".strtab:0x173",
+        "value": "helper_multiply",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 16
+        }
+      },
+      {
+        "address": ".strtab:0x183",
+        "value": "__data_start",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 13
+        }
+      },
+      {
+        "address": ".strtab:0x190",
+        "value": "__gmon_start__",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 15
+        }
+      },
+      {
+        "address": ".strtab:0x19f",
+        "value": "__dso_handle",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 13
+        }
+      },
+      {
+        "address": ".strtab:0x1ac",
+        "value": "compute_score",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 14
+        }
+      },
+      {
+        "address": ".strtab:0x1ba",
+        "value": "_IO_stdin_used",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 15
+        }
+      },
+      {
+        "address": ".strtab:0x1c9",
+        "value": "_end",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 5
+        }
+      },
+      {
+        "address": ".strtab:0x1ce",
+        "value": "__bss_start",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 12
+        }
+      },
+      {
+        "address": ".strtab:0x1da",
+        "value": "main",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 5
+        }
+      },
+      {
+        "address": ".strtab:0x1df",
+        "value": "__TMC_END__",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 12
+        }
+      },
+      {
+        "address": ".strtab:0x1eb",
+        "value": "_ITM_registerTMCloneTable",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 26
+        }
+      },
+      {
+        "address": ".strtab:0x205",
+        "value": "__cxa_finalize@GLIBC_2.2.5",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 27
+        }
+      },
+      {
+        "address": ".strtab:0x220",
+        "value": "_init",
+        "string": {
+          "encoding": "UTF-8",
+          "termination": "present_or_not_required",
+          "byte_length": 6
+        }
+      }
+    ],
+    "confidence": "observed",
+    "authority": "shipped-artifact",
+    "environment": null,
+    "limitations": [
+      "The session serves operations only after Ghidra reports default auto-analysis complete; incomplete analysis does not expose partial results.",
+      "The imported Program and temporary project are ephemeral and deleted on close. Annotation operations edit session database metadata; original executable bytes are never written.",
+      "Cancelling an active Ghidra request terminates its ephemeral database and discards session annotations. The selected target remains open; the next provider query imports the original artifact again.",
+      "Default-space addresses use lowercase 0x-prefixed hexadecimal; other address spaces use <percent-encoded-space>:0x<hex>.",
+      "Only Ghidra-defined string Data is observed; packed or undefined string bytes may be absent. Completeness applies to that inventory, and an empty search does not establish that text is absent from the artifact. If an address is known, use read_bytes and xrefs to inspect bytes and references.",
+      "Charset is reported, while a non-missing terminator cannot distinguish a present terminator from a fixed or Pascal layout."
+    ],
+    "relationship_coverage": null,
+    "locations": [],
+    "evidence_links": []
+  }
+]
