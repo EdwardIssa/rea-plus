@@ -13,6 +13,7 @@ import {
   resolveMcpInputSchemaProfile,
   type McpInputSchemaProfile,
 } from "../config/mcpInputSchemaProfile.js";
+import { parseMcpToolSurface } from "../config/mcpToolSurface.js";
 import { DeferredEvidenceMcpServer } from "../server/DeferredEvidenceMcpServer.js";
 import { ToolResultDelivery } from "../server/ToolResultDelivery.js";
 import { createLogger } from "../logger.js";
@@ -136,6 +137,11 @@ export const runDeferred = async (
     layer: "server",
   });
   const profile = resolveMcpInputSchemaProfile(config.mcpInputSchemaProfile);
+  const surface = parseMcpToolSurface(
+    dependencies.env.REA_MCP_TOOL_SURFACE,
+  );
+  if (!surface.ok) throw surface.error;
+  const toolSurfaceMode = surface.value ?? "full";
   let firstCatalog: RecordedMcpCatalog | undefined = readCatalog(profile);
   const servers = new OwnedMcpServers<DeferredEvidenceMcpServer>();
   let handle: McpServerHandle | undefined;
@@ -203,6 +209,9 @@ export const runDeferred = async (
               catalog,
               new ToolResultDelivery(
                 config.mcpMaxResponseBytes ?? STDIO_DEFAULT_MAX_BUFFER_SIZE,
+                undefined,
+                undefined,
+                { spilloverTruncationEnabled: toolSurfaceMode === "lazy" },
               ),
               (target) =>
                 initializeRuntime(
@@ -215,7 +224,12 @@ export const runDeferred = async (
                   dependencies.setExitCode(1);
                   throw cause;
                 }),
-              config.mcpMaxInputElements,
+              {
+                ...(config.mcpMaxInputElements === undefined
+                  ? {}
+                  : { maximumInputElements: config.mcpMaxInputElements }),
+                toolSurfaceMode,
+              },
             );
             return server;
           });

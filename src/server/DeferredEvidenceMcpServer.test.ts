@@ -143,7 +143,9 @@ const fixture = async (
         );
       });
     },
-    options.maximumInputElements,
+    options.maximumInputElements === undefined
+      ? {}
+      : { maximumInputElements: options.maximumInputElements },
   );
   const client = new Client({ name: "deferred-fixture-client", version: "1" });
   const [clientTransport, serverTransport] =

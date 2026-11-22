@@ -8,6 +8,7 @@ import {
   catalogIdentityForToolFamilies,
   type createCatalogIdentity,
 } from "../catalogIdentity.js";
+import type { McpToolSurfaceMode } from "../config/mcpToolSurface.js";
 import { toolFamilyId } from "../contracts/toolFamilies.js";
 import type { ToolResultDelivery } from "./ToolResultDelivery.js";
 import type { McpOutputSchemaProfile } from "../config/mcpOutputSchemaProfile.js";
@@ -25,6 +26,7 @@ export class EvidenceMcpServer extends EvidenceMcpServerCore {
     outputSchemaProfile: McpOutputSchemaProfile = "full",
     identity?: ReturnType<typeof createCatalogIdentity>,
     advertisedToolFamilies: ReadonlySet<string> | undefined = undefined,
+    toolSurfaceMode: McpToolSurfaceMode = "full",
   ) {
     super(
       info,
@@ -40,6 +42,7 @@ export class EvidenceMcpServer extends EvidenceMcpServerCore {
           advertisedToolFamilies,
         ),
       advertisedToolFamilies,
+      toolSurfaceMode,
     );
   }
 
@@ -53,5 +56,10 @@ export class EvidenceMcpServer extends EvidenceMcpServerCore {
     if (families === undefined) return true;
     const family = toolFamilyId(name);
     return family !== undefined && families.has(family);
+  }
+
+  /** The eager server resolves discovery families from the registry. */
+  override toolFamily(name: string): string | undefined {
+    return toolFamilyId(name);
   }
 }

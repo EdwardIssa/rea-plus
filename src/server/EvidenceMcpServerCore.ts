@@ -61,6 +61,12 @@ import {
   TARGET_CONTENT_RESULT_META,
 } from "./toolResultEncoding.js";
 import { RequestTrackingMcpServer } from "./RequestTrackingMcpServer.js";
+import type { McpToolSurfaceMode } from "../config/mcpToolSurface.js";
+import {
+  McpToolSurface,
+  type AdvertisedToolEntry,
+  type AdvertisedToolSchemas,
+} from "./toolDiscovery.js";
 import type { WithAdmittedAnalysis } from "./analysisAdmission.js";
 import { canReferenceInlineEvidence } from "./evidenceInputRegistration.js";
 import {
@@ -296,11 +302,23 @@ export interface StandardToolRegistration {
   readonly _meta?: Record<string, unknown>;
 }
 
+/** One bound tool, retained for discovery search and schema loading. */
+interface BoundToolEntry {
+  readonly registered: RegisteredTool;
+  readonly title?: string;
+  readonly description?: string;
+  readonly inputSchema?: StandardSchemaWithJSON;
+  readonly outputSchema?: StandardSchemaWithJSON;
+}
+
 /** Bind oversized MCP error recovery to this server's Evidence ledger. */
 export class EvidenceMcpServerCore extends RequestTrackingMcpServer {
   analysisSettings: AnalysisSettings | undefined;
   /** Transport-owned Evidence uses the same lifetime as application writes. */
   withAdmittedAnalysis: WithAdmittedAnalysis | undefined;
+  /** Lazy-surface state: connect-time advertisement and on-demand loads. */
+  readonly toolSurface: McpToolSurface;
+  private readonly boundTools = new Map<string, BoundToolEntry>();
   private identity: ReturnType<typeof createCatalogIdentity> | undefined;
 
   /** Composition supplies identity without importing the canonical schema graph. */
@@ -362,6 +380,7 @@ export class EvidenceMcpServerCore extends RequestTrackingMcpServer {
     readonly advertisedToolFamilies:
       | ReadonlySet<string>
       | undefined = undefined,
+    toolSurfaceMode: McpToolSurfaceMode = "full",
   ) {
     const maximumInputElements =
       options.maxToolInputElements ?? DEFAULT_MCP_MAX_INPUT_ELEMENTS;
@@ -372,6 +391,85 @@ export class EvidenceMcpServerCore extends RequestTrackingMcpServer {
         ? undefined
         : { budgetBytes: compactPresentation.budgetBytes };
     this.identity = identity;
+    this.toolSurface = new McpToolSurface(toolSurfaceMode, {
+      entries: () =>
+        [...this.boundTools.entries()].map(
+          ([name, entry]): AdvertisedToolEntry => {
+            const family = this.toolFamily(name);
+            return {
+              name,
+              ...(entry.title === undefined ? {} : { title: entry.title }),
+              ...(entry.description === undefined
+                ? {}
+                : { description: entry.description }),
+              ...(family === undefined ? {} : { family }),
+            };
+          },
+        ),
+      schemas: (name) => this.advertisedSchemas(name),
+      advertises: (name) => this.advertisesTool(name),
+      enable: (name) => {
+        const entry = this.boundTools.get(name);
+        if (entry === undefined) return false;
+        entry.registered.enable();
+        return true;
+      },
+      disable: (name) => {
+        const entry = this.boundTools.get(name);
+        if (entry === undefined) return false;
+        entry.registered.disable();
+        return true;
+      },
+    });
+  }
+
+  /** The schemas tools/list presents for one bound tool, for schema loads. */
+  private advertisedSchemas(name: string): AdvertisedToolSchemas | undefined {
+    const entry = this.boundTools.get(name);
+    if (entry === undefined) return undefined;
+    const project = (
+      schema: StandardSchemaWithJSON | undefined,
+      kind: "input" | "output",
+    ): Record<string, unknown> | undefined => {
+      if (schema === undefined || !hasAdvertisedInputJsonSchema(schema))
+        return undefined;
+      const jsonSchema = Reflect.get(schema["~standard"], "jsonSchema");
+      const convert = Reflect.get(jsonSchema, kind) as
+        | ((this: unknown, options: { target: string }) => unknown)
+        | undefined;
+      if (typeof convert !== "function") return undefined;
+      // Mirror the SDK's own conversion: the draft target argument is
+      // required by advertised-schema transformers, and a typeless root is
+      // stamped as an object schema (inputs always; outputs when the root
+      // carries object keywords).
+      const projected: unknown = convert.call(jsonSchema, {
+        target: "draft-2020-12",
+      });
+      if (!isRecord(projected)) return undefined;
+      if (projected.type !== undefined) return projected;
+      const objectShaped =
+        kind === "input" ||
+        projected.properties !== undefined ||
+        projected.required !== undefined ||
+        projected.additionalProperties !== undefined ||
+        projected.patternProperties !== undefined;
+      return objectShaped ? { type: "object", ...projected } : projected;
+    };
+    const inputSchema = project(entry.inputSchema, "input");
+    if (inputSchema === undefined) return undefined;
+    const rawOutput = project(entry.outputSchema, "output");
+    const compactPresentation =
+      compactPresentationForMcpOutputSchemaProfile(this.outputSchemaProfile);
+    const outputSchema =
+      rawOutput === undefined || this.outputSchemaProfile === "off"
+        ? undefined
+        : compactPresentation === undefined
+          ? rawOutput
+          : presentAdvertisedOutputSchema(rawOutput, compactPresentation);
+    return {
+      inputSchema,
+      ...(outputSchema === undefined ? {} : { outputSchema }),
+    };
   }
 
   /**
@@ -449,6 +547,18 @@ export class EvidenceMcpServerCore extends RequestTrackingMcpServer {
     return true;
   }
 
+  /**
+   * The discovery family of one tool, when this server resolves families.
+   * The core resolves none: the family registry is built from the tool
+   * contracts, and loading it would pull the contract graph into the
+   * deferred server's entrypoint phase. The eager server overrides this
+   * with the registry lookup; the deferred server's discovery entries
+   * carry no family and its search scores name and text signals only.
+   */
+  toolFamily(_name: string): string | undefined {
+    return undefined;
+  }
+
   /** Provider probes consult the registration scope before doing work. */
   advertisesFamily(family: string): boolean {
     return (
@@ -462,7 +572,28 @@ export class EvidenceMcpServerCore extends RequestTrackingMcpServer {
     config: StandardToolRegistration,
     callback: ToolCallback<StandardSchemaWithJSON | undefined>,
   ): RegisteredTool {
-    return super.registerTool(name, config as never, callback as never);
+    const registered = super.registerTool(
+      name,
+      config as never,
+      callback as never,
+    );
+    this.boundTools.set(name, {
+      registered,
+      ...(config.title === undefined ? {} : { title: config.title }),
+      ...(config.description === undefined
+        ? {}
+        : { description: config.description }),
+      ...(config.inputSchema === undefined
+        ? {}
+        : { inputSchema: config.inputSchema }),
+      ...(config.outputSchema === undefined
+        ? {}
+        : { outputSchema: config.outputSchema }),
+    });
+    // The lazy surface advertises only its connect-time set; every other
+    // bound tool starts disabled and is enabled by load_tool_schema.
+    if (!this.toolSurface.isInitiallyAdvertised(name)) registered.disable();
+    return registered;
   }
 
   /** Preserve the SDK transport lifecycle while retaining oversized errors. */
