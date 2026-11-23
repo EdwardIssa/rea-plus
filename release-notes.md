@@ -1190,6 +1190,7 @@
 * **ghidra:** expect carved MIPS copies to be refused at target opening ([#8227](https://github.com/EdwardIssa/rea-plus/issues/8227)) ([091892d](https://github.com/EdwardIssa/rea-plus/commit/091892dfedd9f50cc68c7bbb63e44d5ca1754fcb))
 * guard target format vocabularies and DOL snapshot saves ([#7481](https://github.com/EdwardIssa/rea-plus/issues/7481)) ([54756ff](https://github.com/EdwardIssa/rea-plus/commit/54756ff24e1f4c2e47554f61ea5efe57bab27b64))
 * **hopper:** verify bootstrap cleanup ownership ([c79bd41](https://github.com/EdwardIssa/rea-plus/commit/c79bd41b5d6d65b7b2a9b6e0b58d376fc36910d6))
+* **javascript:** add Stryker mutation testing for the JavaScript domain ([14792a2](https://github.com/EdwardIssa/rea-plus/commit/14792a2131d9575e376ab596209996ae4cb43ba1))
 * **javascript:** cover Request endpoint identity and provenance ([#6365](https://github.com/EdwardIssa/rea-plus/issues/6365)) ([09c889b](https://github.com/EdwardIssa/rea-plus/commit/09c889b3b5c6df26c47565cc1b8fcad8864c8710))
 * **javascript:** cross-shard RPC join matrix and sharded parity fixture ([b5e8c76](https://github.com/EdwardIssa/rea-plus/commit/b5e8c765da046c972d7bb4eee0a751cce4be6782))
 * **javascript:** object-form dependency map parity fixtures ([c9adb67](https://github.com/EdwardIssa/rea-plus/commit/c9adb6759733624c7fe529b5cbb6c9e37d564201))
