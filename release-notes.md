@@ -1204,6 +1204,7 @@
 * **javascript:** pin the global-reference gate's namespace-slot and path-length guards ([cb41ecf](https://github.com/EdwardIssa/rea-plus/commit/cb41ecf25db968bcb41cb64c1bab00238c80286a))
 * **javascript:** pin whole-file exports parity beside widening global writes ([cb9198d](https://github.com/EdwardIssa/rea-plus/commit/cb9198dbd9e068087fbe841e322bc7ff9b2b3ca8))
 * **javascript:** pin whole-file fetch endpoint parity beside widening global writes ([1d786fc](https://github.com/EdwardIssa/rea-plus/commit/1d786fca709e323084f8e2d44b4cb6a3dafc3d5c))
+* **javascript:** pin XHR recognition guards and receiver walk with scenario fixtures ([4b673ce](https://github.com/EdwardIssa/rea-plus/commit/4b673ce5adbd106a8867f4d312ceb1580141ccdf))
 * **mcp:** bound schema compilation for native and web workflows ([6be6596](https://github.com/EdwardIssa/rea-plus/commit/6be6596aaca5a9f584fd726b9ca7733d5b54f55a))
 * **mcp:** pin concurrent lazy-surface load behavior ([878a7c6](https://github.com/EdwardIssa/rea-plus/commit/878a7c6002a8ffc1d5f8d0181b647e90f4a848d2))
 * **mcp:** pin full-surface selection where suites contract with the complete catalog ([ee3263b](https://github.com/EdwardIssa/rea-plus/commit/ee3263b6ece6445a1342de0724e60e892fd1f63c))
