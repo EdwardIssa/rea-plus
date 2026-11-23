@@ -1195,6 +1195,7 @@
 * **javascript:** object-form dependency map parity fixtures ([c9adb67](https://github.com/EdwardIssa/rea-plus/commit/c9adb6759733624c7fe529b5cbb6c9e37d564201))
 * **javascript:** pin parent result-budget truncation markers and resume cursor ([8cf3c09](https://github.com/EdwardIssa/rea-plus/commit/8cf3c097c1c9ef57a3ffbf760972d20669584344))
 * **javascript:** pin storage parity beside symbol-keyed and polyfill global writes ([b195da9](https://github.com/EdwardIssa/rea-plus/commit/b195da9ce99fbd71fe6f13661f9999123682cead))
+* **javascript:** pin whole-file exports parity beside widening global writes ([cb9198d](https://github.com/EdwardIssa/rea-plus/commit/cb9198dbd9e068087fbe841e322bc7ff9b2b3ca8))
 * **mcp:** bound schema compilation for native and web workflows ([6be6596](https://github.com/EdwardIssa/rea-plus/commit/6be6596aaca5a9f584fd726b9ca7733d5b54f55a))
 * **mcp:** pin full-surface selection where suites contract with the complete catalog ([ee3263b](https://github.com/EdwardIssa/rea-plus/commit/ee3263b6ece6445a1342de0724e60e892fd1f63c))
 * **mcp:** validate selected tools without compiling the entire catalog ([cc5a969](https://github.com/EdwardIssa/rea-plus/commit/cc5a96933aaae4738289c349c8720037c7b45590))
