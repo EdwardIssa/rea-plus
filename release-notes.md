@@ -1201,6 +1201,7 @@
 * **mcp:** pin concurrent lazy-surface load behavior ([878a7c6](https://github.com/EdwardIssa/rea-plus/commit/878a7c6002a8ffc1d5f8d0181b647e90f4a848d2))
 * **mcp:** pin full-surface selection where suites contract with the complete catalog ([ee3263b](https://github.com/EdwardIssa/rea-plus/commit/ee3263b6ece6445a1342de0724e60e892fd1f63c))
 * **mcp:** pin server-down degradation for MCP clients ([b15a0d7](https://github.com/EdwardIssa/rea-plus/commit/b15a0d76b87aeff5ec0a364faf4b62307e61edfa))
+* **mcp:** re-point unsupported analysis-view fixture at an unprojected parent operation ([0f9106f](https://github.com/EdwardIssa/rea-plus/commit/0f9106fcbd5ad52ec83f1557e96ad5ec055e54f6))
 * **mcp:** validate selected tools without compiling the entire catalog ([cc5a969](https://github.com/EdwardIssa/rea-plus/commit/cc5a96933aaae4738289c349c8720037c7b45590))
 * **native:** bind lipo refusal fixture to a real source ([#7977](https://github.com/EdwardIssa/rea-plus/issues/7977)) ([9cc3417](https://github.com/EdwardIssa/rea-plus/commit/9cc34178c00cea6fb5f2938b4d7f102d2f83db05))
 * **package:** migrate skill metadata fixture to frontmatter ([23bc51d](https://github.com/EdwardIssa/rea-plus/commit/23bc51d5c48306ef91cc6f1766783bc89e18293d))
