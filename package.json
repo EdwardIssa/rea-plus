@@ -171,6 +171,7 @@
     "test:coverage:reverse-tools": "vitest run --config vitest.reverse-tools.config.ts --coverage.enabled",
     "pretest:coverage:reverse-tools": "npm run test:prepare",
     "test:mutation:reverse-tools": "node scripts/prepare-reverse-tools-mutation.mjs && stryker run stryker.config.mjs && stryker run stryker.semantics.config.mjs",
+    "test:mutation:javascript": "node scripts/prepare-reverse-tools-mutation.mjs && stryker run stryker.javascript.config.mjs",
     "pretest:mutation:reverse-tools": "npm run test:prepare",
     "test:ci": "npm run test:coverage -- --reporter=default --reporter=junit --outputFile.junit=test-results.xml",
     "pretest:ci:shard": "npm run test:prepare",

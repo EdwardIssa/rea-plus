@@ -35,6 +35,7 @@ htmlcov/
 coverage/
 .stryker-tmp/
 reports/mutation/
+reports/stryker-incremental.json
 .vitest/
 .vitest-reports/
 test-results.xml
