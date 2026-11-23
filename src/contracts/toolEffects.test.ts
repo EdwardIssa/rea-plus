@@ -182,6 +182,7 @@ describe("tool effects", () => {
       "close_gdb_session",
       "close_rizin_debug_session",
       "cutter_command",
+      "execute_dynamically",
       "execute_rizin_command",
       "gdb_console",
       "install_adb_package",
