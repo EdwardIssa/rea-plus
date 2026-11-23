@@ -2,7 +2,7 @@
 ---
 
 
-## [6.9.0](https://github.com/EdwardIssa/rea-plus/compare/rea-agents-6.8.0...rea-agents-6.9.0) (2026-11-22)
+## [6.9.0](https://github.com/EdwardIssa/rea-plus/compare/rea-agents-6.8.0...rea-agents-6.9.0) (2026-11-23)
 
 
 ### ⚠ BREAKING CHANGES
@@ -116,6 +116,7 @@
 * **javascript:** page retained feature traces through analysis views ([#8522](https://github.com/EdwardIssa/rea-plus/issues/8522)) ([423059a](https://github.com/EdwardIssa/rea-plus/commit/423059a4de9669afa44d81942803083e82149dc4))
 * **javascript:** recover Metro __d module registrations in static analysis ([da02c36](https://github.com/EdwardIssa/rea-plus/commit/da02c361a93058e6a1b18b0701e2dd80451af015))
 * **javascript:** resolve cross-shard RPC endpoints after static merge ([e30a6e3](https://github.com/EdwardIssa/rea-plus/commit/e30a6e3414c177aa7ed559768c174f4cce4015f4))
+* **javascript:** retain degraded Metro module identity in sharded analysis ([5b59b91](https://github.com/EdwardIssa/rea-plus/commit/5b59b9170f2ac1f67e16de7dc778b8d494883113))
 * **javascript:** shard Metro bundle analysis per module with merged results ([fbffd67](https://github.com/EdwardIssa/rea-plus/commit/fbffd67a5dcc110aeaaa5575ed99de55e98e6d80))
 * **javascript:** surface generic .rpc() clients and const-bound storage keys ([41d4262](https://github.com/EdwardIssa/rea-plus/commit/41d4262b123dfca6b6da8afd87c3ade43b7e6326))
 * **kuna:** verify release 1.986 and guide version selection ([#8187](https://github.com/EdwardIssa/rea-plus/issues/8187)) ([245a581](https://github.com/EdwardIssa/rea-plus/commit/245a581818ab13694fa438a06e39898ce03ab206))
