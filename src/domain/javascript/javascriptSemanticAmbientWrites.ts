@@ -3,6 +3,8 @@ import * as t from "@babel/types";
 
 import {
   semanticStaticPropertyKey,
+  semanticWriteSiteTarget,
+  semanticWriteTargets,
   unwrapJavaScriptExpression,
 } from "./javascriptAstValues.js";
 import {
@@ -74,6 +76,19 @@ export const retainSemanticAmbientEffect = (
   path: AmbientPath,
   node: t.Node | undefined,
 ): boolean => {
+  // Every write effect retained under a sole Symbol-keyed member write is
+  // an expansion of that one write (the widened unknown-key path and the
+  // receiver identity it may self-select). The write modifies no
+  // string-keyed property; retaining its expansions would cover every
+  // string property path in this analysis unit. A global-namespace slot
+  // written with the global object itself likewise keeps its denotation.
+  if (
+    kind === "write" &&
+    node !== undefined &&
+    (writeTargetsOnlySymbolKey(node, state) ||
+      writePreservesGlobalNamespace(node, state, path))
+  )
+    return false;
   const selected = kind === "escape" ? [...path, null] : path;
   const byNode = retainedAmbientEffects.get(state) ?? new Map();
   const keys = byNode.get(node) ?? new Set<string>();
@@ -586,6 +601,126 @@ export const createAmbientPathResolver = (
     if (!possibleWrites) cached.set(node, resolution);
     return resolution;
   };
+};
+
+/** Identifier hops followed when proving a computed member key is a Symbol. */
+const SYMBOL_KEY_BINDING_DEPTH = 4;
+
+/**
+ * A computed member key whose value is provably a Symbol: a `Symbol()` or
+ * `Symbol.for()` call on the unshadowed global `Symbol`, a `Symbol.<name>`
+ * read, or an immutable binding whose stable initializer is one. A Symbol
+ * key names no string-keyed property, so a write through it can modify no
+ * string property path.
+ */
+const isProvablySymbolKey = (
+  node: t.Node,
+  state: JavaScriptSemanticAnalysisState,
+  depth = 0,
+): boolean => {
+  const expression = unwrapJavaScriptExpression(node).node;
+  if (
+    t.isCallExpression(expression) ||
+    t.isOptionalCallExpression(expression)
+  ) {
+    const callee = unwrapJavaScriptExpression(expression.callee).node;
+    if (t.isIdentifier(callee))
+      return isUnshadowedGlobal(callee, state, "Symbol");
+    if (
+      (t.isMemberExpression(callee) || t.isOptionalMemberExpression(callee)) &&
+      semanticStaticPropertyKey(callee.property, callee.computed) === "for"
+    ) {
+      const object = unwrapJavaScriptExpression(callee.object).node;
+      return (
+        t.isIdentifier(object) && isUnshadowedGlobal(object, state, "Symbol")
+      );
+    }
+    return false;
+  }
+  if (
+    t.isMemberExpression(expression) ||
+    t.isOptionalMemberExpression(expression)
+  ) {
+    const object = unwrapJavaScriptExpression(expression.object).node;
+    return (
+      t.isIdentifier(object) && isUnshadowedGlobal(object, state, "Symbol")
+    );
+  }
+  if (t.isIdentifier(expression) && depth < SYMBOL_KEY_BINDING_DEPTH) {
+    const binding = resolveSemanticBindingState(
+      state,
+      expression,
+      expression.name,
+    );
+    if (binding === undefined || binding.mutable) return false;
+    const initializer = semanticStableInitializer(binding, state);
+    return (
+      initializer !== undefined &&
+      initializer.projection.length === 0 &&
+      isProvablySymbolKey(initializer.node, state, depth + 1)
+    );
+  }
+  return false;
+};
+
+/**
+ * A write whose sole target is one member write through a provably Symbol
+ * key (statically non-literal, so the indexer widened it to an unknown key)
+ * modifies no string-keyed property; its retained path must not cover
+ * string property paths.
+ */
+const writeTargetsOnlySymbolKey = (
+  node: t.Node,
+  state: JavaScriptSemanticAnalysisState,
+): boolean => {
+  const target = semanticWriteSiteTarget(node);
+  if (target === null) return false;
+  let leaves = 0;
+  for (const leaf of semanticWriteTargets(target)) {
+    leaves += 1;
+    if (leaves > 1) return false;
+    const member = unwrapJavaScriptExpression(leaf).node;
+    if (!t.isMemberExpression(member) && !t.isOptionalMemberExpression(member))
+      return false;
+    if (semanticStaticPropertyKey(member.property, member.computed) !== null)
+      return false;
+    if (!isProvablySymbolKey(member.property, state)) return false;
+  }
+  return leaves === 1;
+};
+
+/**
+ * A write of a global-object name slot whose assigned value is itself an
+ * unshadowed global-object reference leaves the slot denoting the global
+ * object (the `self.globalThis = self` polyfill shape); neither the slot
+ * path nor the receiver identity path it expands to may mark the
+ * namespace as overwritten.
+ */
+const writePreservesGlobalNamespace = (
+  node: t.Node,
+  state: JavaScriptSemanticAnalysisState,
+  path: AmbientPath,
+): boolean => {
+  if (path[0] !== "global" || path.length > 2) return false;
+  if (!t.isAssignmentExpression(node) || node.operator !== "=") return false;
+  const target = semanticWriteSiteTarget(node);
+  if (target === null) return false;
+  let leaves = 0;
+  let key: string | null = null;
+  for (const leaf of semanticWriteTargets(target)) {
+    leaves += 1;
+    if (leaves > 1) return false;
+    const member = unwrapJavaScriptExpression(leaf).node;
+    if (!t.isMemberExpression(member) && !t.isOptionalMemberExpression(member))
+      return false;
+    key = semanticStaticPropertyKey(member.property, member.computed);
+    if (key === null || !GLOBAL_OBJECT_NAMES.includes(key)) return false;
+    if (globalObjectName(member.object, state) === undefined) return false;
+  }
+  if (leaves !== 1 || key === null) return false;
+  if (path.length === 2 && path[1] !== key) return false;
+  const value = unwrapJavaScriptExpression(node.right).node;
+  return t.isIdentifier(value) && globalObjectName(value, state) !== undefined;
 };
 
 /**
