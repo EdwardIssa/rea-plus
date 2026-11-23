@@ -142,6 +142,26 @@ export interface JavaScriptBundlerModule extends JavaScriptBundlerModuleState {
   readonly structural_fingerprint_algorithm: typeof JAVASCRIPT_AST_FINGERPRINT_ALGORITHM;
 }
 
+/**
+ * One Metro module whose definition statement was located by the bundle
+ * scan but whose factory was never analyzed (its shard degraded). Only
+ * scan-level facts are recorded: the module key, the dependency keys the
+ * definition statement declares, and the statement's size and location.
+ * Every analysis-derived fact (exports, factory shape, calls) remains
+ * unknown, never absent and never invented.
+ */
+export interface JavaScriptBundlerModuleSalvage {
+  readonly module_key: string;
+  /** Dependency keys declared by the definition statement; null when the
+   * dependency argument was not a static array of literals. */
+  readonly dependency_module_keys: readonly string[] | null;
+  /** Source bytes covered by the module definition statement. */
+  readonly source_bytes: number;
+  readonly location: JavaScriptSourceRange;
+  /** Why the module's analysis facts remain unknown. */
+  readonly reason: string;
+}
+
 /** One statically recognized bundler chunk or module registration. */
 export interface JavaScriptBundlerRegistration {
   readonly bundler: "webpack" | "rspack" | "esbuild" | "metro";
@@ -155,6 +175,9 @@ export interface JavaScriptBundlerRegistration {
   readonly async_chunk_keys: readonly string[];
   readonly unknown_async_chunk_keys: number;
   readonly modules: readonly JavaScriptBundlerModule[];
+  /** Modules retained by identity salvage after their shard degraded;
+   * absent in analyses produced before salvage existed. */
+  readonly degraded_modules?: readonly JavaScriptBundlerModuleSalvage[];
   readonly location: JavaScriptSourceRange;
 }
 

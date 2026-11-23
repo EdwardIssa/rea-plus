@@ -7,7 +7,10 @@ import {
 } from "../domain/javascript/javascriptSourceParser.js";
 import { analyzeParsedJavaScriptStaticSourceSteps } from "../domain/javascript/javascriptStaticAnalysis.js";
 import { analyzeParsedJavaScriptSemanticsSteps } from "../domain/javascript/javascriptSemanticAnalysis.js";
-import { failedJavaScriptStaticAnalysis } from "../domain/javascript/javascriptStaticAnalysisHelpers.js";
+import {
+  failedJavaScriptStaticAnalysis,
+  range,
+} from "../domain/javascript/javascriptStaticAnalysisHelpers.js";
 import {
   mergeJavaScriptModuleSemantics,
   projectJavaScriptModuleSemantics,
@@ -153,9 +156,22 @@ const analyzeSharded = async (
           },
         });
       } else {
+        const definitionStatement = shard.statements[0];
         degraded.push({
           moduleKey: shard.moduleKey,
           reason: `static analysis exceeded its per-module time budget of ${String(Math.round(budget))} ms; the module's facts remain unknown`,
+          // Identity salvage may use only what the bundle scan recorded
+          // about the definition statement; the factory was not analyzed.
+          ...(shard.kind === "module" && definitionStatement !== undefined
+            ? {
+                definition: {
+                  dependencyModuleKeys: shard.dependencyModuleKeys,
+                  sourceBytes: shard.bytes,
+                  location: range(definitionStatement),
+                  defineOffset: definitionStatement.start ?? 0,
+                },
+              }
+            : {}),
         });
         outcomes.push({
           shard,

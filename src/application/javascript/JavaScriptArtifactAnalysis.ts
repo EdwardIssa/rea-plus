@@ -39,6 +39,7 @@ import {
 } from "./JavaScriptJsonDocuments.js";
 import { assertJavaScriptAnalysisActive } from "./JavaScriptAnalysisControl.js";
 import { htmlArtifactReferences } from "../../domain/javascript/htmlArtifactReferences.js";
+import { javaScriptDegradedShardLimitation } from "../../domain/javascript/javascriptStaticAnalysisMerge.js";
 import type { JavaScriptSourceAnalysisPort } from "../../domain/javascript/javascriptSourceAnalysis.js";
 import type { JavaScriptSemanticGraphProjection } from "./JavaScriptSemanticGraphBuilder.js";
 import { AnalysisError } from "../../domain/analysisErrorBase.js";
@@ -62,6 +63,7 @@ interface MutableArtifactAnalysis {
   visitedNodes: number;
   findings: number;
   modules: number;
+  degradedModules: number;
   parseFailures: number;
 }
 
@@ -194,7 +196,12 @@ export const analyzeAndAdoptJavaScriptArtifactFiles = async (
           findingCount(facts.javascript) +
           (facts.module?.moduleLinks.length ?? 0);
         state.modules += facts.javascript.bundler_registrations.reduce(
-          (count, item) => count + item.modules.length,
+          (count, item) =>
+            count + item.modules.length + (item.degraded_modules?.length ?? 0),
+          0,
+        );
+        state.degradedModules += facts.javascript.bundler_registrations.reduce(
+          (count, item) => count + (item.degraded_modules?.length ?? 0),
           0,
         );
         if (facts.javascript.parse_status === "failed")
@@ -302,6 +309,34 @@ export const analyzeAndAdoptJavaScriptArtifactFiles = async (
 const finalizeArtifactAnalysis = (
   state: MutableArtifactAnalysis,
 ): JavaScriptArtifactAnalysis => {
+  const limitations = [
+    "JavaScript and HTML were parsed as inert text; bundle bootstrap code was never executed.",
+    "Static paths and relationships may remain unresolved when expressions are dynamic or obfuscated.",
+    ...state.htmlInlineScripts.map(htmlInlineScriptLimitation),
+    ...state.files.flatMap(
+      ({ analysis_failure, application_projection_failure }) =>
+        [analysis_failure, application_projection_failure].flatMap((failure) =>
+          failure === undefined ? [] : [failure.reason],
+        ),
+    ),
+  ];
+  // A degraded module's facts are unknown for the whole record, so its
+  // limitation belongs at record level, not only inside per-observation
+  // evidence. The strings are rebuilt from the salvage records with the
+  // merge's own formatter, keeping one source for the wording.
+  const seen = new Set(limitations);
+  for (const { javascript } of state.files)
+    for (const registration of javascript?.bundler_registrations ?? [])
+      for (const salvaged of registration.degraded_modules ?? []) {
+        const limitation = javaScriptDegradedShardLimitation(
+          salvaged.module_key,
+          salvaged.reason,
+        );
+        if (!seen.has(limitation)) {
+          seen.add(limitation);
+          limitations.push(limitation);
+        }
+      }
   return {
     jsonDocuments: state.jsonDocuments,
     files: state.files,
@@ -319,18 +354,9 @@ const finalizeArtifactAnalysis = (
         0,
       ),
     modules: state.modules,
+    degraded_modules: state.degradedModules,
     parse_failures: state.parseFailures,
-    limitations: [
-      "JavaScript and HTML were parsed as inert text; bundle bootstrap code was never executed.",
-      "Static paths and relationships may remain unresolved when expressions are dynamic or obfuscated.",
-      ...state.htmlInlineScripts.map(htmlInlineScriptLimitation),
-      ...state.files.flatMap(
-        ({ analysis_failure, application_projection_failure }) =>
-          [analysis_failure, application_projection_failure].flatMap(
-            (failure) => (failure === undefined ? [] : [failure.reason]),
-          ),
-      ),
-    ],
+    limitations,
   };
 };
 
@@ -373,6 +399,7 @@ const emptyArtifactAnalysis = (): MutableArtifactAnalysis => ({
   visitedNodes: 0,
   findings: 0,
   modules: 0,
+  degradedModules: 0,
   parseFailures: 0,
 });
 

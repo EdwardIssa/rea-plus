@@ -223,6 +223,9 @@ export interface JavaScriptArtifactAnalysis {
   readonly visited_ast_nodes: number;
   readonly findings: number;
   readonly modules: number;
+  /** Modules retained by identity salvage after their shard degraded;
+   * already included in `modules`. */
+  readonly degraded_modules: number;
   readonly parse_failures: number;
   readonly limitations: readonly string[];
 }

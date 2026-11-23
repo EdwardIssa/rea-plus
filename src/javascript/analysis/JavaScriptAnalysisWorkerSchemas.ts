@@ -447,6 +447,17 @@ export const javaScriptWorkerStaticAnalysisSchema = z
             ),
           }),
         ),
+        degraded_modules: z
+          .array(
+            z.strictObject({
+              module_key: z.string(),
+              dependency_module_keys: z.array(z.string()).nullable(),
+              source_bytes: count,
+              location: range,
+              reason: z.string(),
+            }),
+          )
+          .exactOptional(),
         location: range,
       }),
     ),

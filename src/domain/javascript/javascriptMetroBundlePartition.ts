@@ -12,6 +12,14 @@ export interface JavaScriptBundleShard {
   readonly kind: "prelude" | "module";
   /** Metro module key for module shards; null for the prelude. */
   readonly moduleKey: string | null;
+  /**
+   * Dependency keys declared by the module definition statement, for
+   * module shards: the literal keys when the dependency argument is a
+   * static array (or absent, which declares none), null when the
+   * argument is present but not statically readable. Null for the
+   * prelude, which declares no module.
+   */
+  readonly dependencyModuleKeys: readonly string[] | null;
   readonly statements: readonly t.Statement[];
   /** Source bytes covered by this shard's statements. */
   readonly bytes: number;
@@ -32,7 +40,10 @@ export const METRO_BUNDLE_MIN_MODULE_BYTE_SHARE = 0.5;
 
 const isMetroModuleDefinition = (
   statement: t.Statement,
-): { readonly moduleKey: string } | null => {
+): {
+  readonly moduleKey: string;
+  readonly dependencyModuleKeys: readonly string[] | null;
+} | null => {
   if (!t.isExpressionStatement(statement)) return null;
   const call = statement.expression;
   if (!t.isCallExpression(call)) return null;
@@ -44,7 +55,28 @@ const isMetroModuleDefinition = (
   )
     return null;
   const moduleKey = argumentValue(call.arguments[1]);
-  return moduleKey === undefined ? null : { moduleKey };
+  if (moduleKey === undefined) return null;
+  // The dependency argument is the definition's own declaration, readable
+  // without analyzing the factory: a static array of literals yields its
+  // keys, an absent argument declares none, anything else stays unknown.
+  const dependencies = call.arguments[2];
+  let dependencyModuleKeys: readonly string[] | null = null;
+  if (dependencies === undefined) {
+    dependencyModuleKeys = [];
+  } else if (t.isArrayExpression(dependencies)) {
+    const keys: string[] = [];
+    let readable = true;
+    for (const element of dependencies.elements) {
+      const key = element === null ? undefined : argumentValue(element);
+      if (key === undefined) {
+        readable = false;
+        break;
+      }
+      keys.push(key);
+    }
+    if (readable) dependencyModuleKeys = keys;
+  }
+  return { moduleKey, dependencyModuleKeys };
 };
 
 const statementBytes = (statement: t.Statement): number =>
@@ -76,6 +108,7 @@ export const partitionMetroBundle = (
       modules.push({
         kind: "module",
         moduleKey: definition.moduleKey,
+        dependencyModuleKeys: definition.dependencyModuleKeys,
         statements: [statement],
         bytes,
       });
@@ -90,6 +123,7 @@ export const partitionMetroBundle = (
       {
         kind: "prelude",
         moduleKey: null,
+        dependencyModuleKeys: null,
         statements: prelude,
         bytes: totalBytes - moduleBytes,
       },

@@ -101,7 +101,9 @@ const createBundlerChunkNode = (
           unknown_entry_module_keys: registration.unknown_entry_module_keys,
           async_chunk_keys: registration.async_chunk_keys,
           unknown_async_chunk_keys: registration.unknown_async_chunk_keys,
-          module_count: registration.modules.length,
+          module_count:
+            registration.modules.length +
+            (registration.degraded_modules?.length ?? 0),
         },
         evidence: astObservationEvidence({
           sha256: file.sha256,
@@ -175,6 +177,63 @@ const addBundlerModuleNodes = (
         runtime: registration.runtime,
         chunk_keys: registration.chunk_keys,
         module_key: moduleValue.module_key,
+      },
+    });
+  }
+  // A degraded module keeps its identity with only definition-statement
+  // facts; analysis-derived properties are omitted, never invented, and
+  // the observation is marked degraded so consumers can tell it apart
+  // from a fully analyzed module.
+  for (const salvaged of registration.degraded_modules ?? []) {
+    const module = context.accumulator.addNode({
+      kind: "javascript-module",
+      identity: artifactLocalIdentity(
+        file.sha256,
+        `${registration.runtime}:module`,
+        salvaged.module_key,
+      ),
+      observations: [
+        {
+          label: salvaged.module_key,
+          properties: {
+            path: file.path,
+            bundler: registration.bundler,
+            runtime: registration.runtime,
+            chunk_keys: registration.chunk_keys,
+            module_key: salvaged.module_key,
+            runtime_entry: registration.entry_module_keys.includes(
+              salvaged.module_key,
+            ),
+            dependency_module_keys: salvaged.dependency_module_keys,
+            source_bytes: salvaged.source_bytes,
+            analysis_status: "degraded",
+          },
+          evidence: astObservationEvidence({
+            sha256: file.sha256,
+            path: file.path,
+            range: salvaged.location,
+            operation: "retain-degraded-bundler-module",
+            coverage,
+            limitations,
+          }),
+        },
+      ],
+    });
+    context.moduleNodes.set(
+      moduleLookupKey(file.path, registration.runtime, salvaged.module_key),
+      module,
+    );
+    addAstContainsEdge(context, {
+      source: chunk,
+      target: module,
+      file,
+      range: salvaged.location,
+      coverage,
+      properties: {
+        bundler: registration.bundler,
+        runtime: registration.runtime,
+        chunk_keys: registration.chunk_keys,
+        module_key: salvaged.module_key,
       },
     });
   }

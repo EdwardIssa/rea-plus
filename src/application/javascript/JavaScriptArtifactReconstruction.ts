@@ -76,6 +76,7 @@ export interface JavaScriptArtifactReconstructionResult {
     readonly visited_ast_nodes: number;
     readonly findings: number;
     readonly modules: number;
+    readonly degraded_modules: number;
     readonly parse_failures: number;
   };
   readonly limitations: readonly string[];
@@ -381,6 +382,7 @@ export const reconstructJavaScriptArtifact = async (
           visited_ast_nodes: analysis.visited_ast_nodes,
           findings: analysis.findings,
           modules: analysis.modules,
+          degraded_modules: analysis.degraded_modules,
           parse_failures: analysis.parse_failures,
         },
         limitations: analysis.limitations,

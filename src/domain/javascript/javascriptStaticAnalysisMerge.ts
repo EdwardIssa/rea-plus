@@ -2,7 +2,9 @@ import { uniqueSortedBy } from "../canonicalOrdering.js";
 import { compareUnicodeCodePoints } from "../unicodeCodePointOrder.js";
 import { registrationKey } from "./javascriptStaticAnalysisHelpers.js";
 import type {
+  JavaScriptBundlerModuleSalvage,
   JavaScriptBundlerRegistration,
+  JavaScriptSourceRange,
   JavaScriptStaticAnalysis,
 } from "./javascriptStaticAnalysisTypes.js";
 import {
@@ -17,7 +19,30 @@ export interface JavaScriptDegradedShard {
   readonly moduleKey: string | null;
   /** Why the shard degraded, in analyst-facing words. */
   readonly reason: string;
+  /**
+   * Scan-level facts about the shard's module definition statement, when
+   * the caller retained them: everything identity salvage may use. The
+   * factory itself was never analyzed, so nothing beyond the definition
+   * statement is available here.
+   */
+  readonly definition?: {
+    /** Dependency keys declared by the definition statement; null when
+     * the dependency argument was not statically readable. */
+    readonly dependencyModuleKeys: readonly string[] | null;
+    /** Source bytes covered by the definition statement. */
+    readonly sourceBytes: number;
+    readonly location: JavaScriptSourceRange;
+    /** Source offset of the definition statement, for chunk identity. */
+    readonly defineOffset: number;
+  };
 }
+
+/** The record-level limitation naming one degraded shard. */
+export const javaScriptDegradedShardLimitation = (
+  moduleKey: string | null,
+  reason: string,
+): string =>
+  `Metro module ${moduleKey ?? "(prelude)"} was not fully analyzed: ${reason}`;
 
 const orderedUnion = (groups: readonly (readonly string[])[]): string[] => {
   const seen = new Set<string>();
@@ -128,6 +153,70 @@ const mergeMetroRegistrations = (
   return [...others, merged];
 };
 
+/**
+ * Retain degraded module shards' identities on the folded Metro
+ * registration. Salvage uses only definition-statement facts the bundle
+ * scan recorded; the modules' analysis facts stay unknown. When no
+ * analyzed shard produced a Metro registration (every module shard
+ * degraded), the identities ride on a skeleton built from the earliest
+ * degraded definition and the folder's own constants, so the modules
+ * remain present rather than absent.
+ */
+const attachDegradedModuleSalvage = (
+  registrations: readonly JavaScriptBundlerRegistration[],
+  degraded: readonly JavaScriptDegradedShard[],
+): JavaScriptBundlerRegistration[] => {
+  const salvage: JavaScriptBundlerModuleSalvage[] = [];
+  for (const shard of degraded) {
+    if (shard.moduleKey === null || shard.definition === undefined) continue;
+    salvage.push({
+      module_key: shard.moduleKey,
+      dependency_module_keys: shard.definition.dependencyModuleKeys,
+      source_bytes: shard.definition.sourceBytes,
+      location: shard.definition.location,
+      reason: shard.reason,
+    });
+  }
+  if (salvage.length === 0) return [...registrations];
+  salvage.sort((left, right) =>
+    compareUnicodeCodePoints(left.module_key, right.module_key),
+  );
+  const index = registrations.findIndex(({ bundler }) => bundler === "metro");
+  if (index >= 0)
+    return registrations.map((registration, position) =>
+      position === index
+        ? {
+            ...registration,
+            degraded_modules: [
+              ...(registration.degraded_modules ?? []),
+              ...salvage,
+            ],
+          }
+        : registration,
+    );
+  const earliest = degraded.find(
+    (shard) => shard.moduleKey !== null && shard.definition !== undefined,
+  )!;
+  return [
+    ...registrations,
+    {
+      bundler: "metro",
+      runtime: "metro",
+      chunk_keys: [`metro@${String(earliest.definition!.defineOffset)}`],
+      unknown_chunk_keys: 0,
+      runtime_require_name: "__r",
+      runtime_module_cache_status: "not-observed",
+      entry_module_keys: [],
+      unknown_entry_module_keys: 0,
+      async_chunk_keys: [],
+      unknown_async_chunk_keys: 0,
+      modules: [],
+      degraded_modules: salvage,
+      location: earliest.definition!.location,
+    },
+  ];
+};
+
 const mergeRoutes = (
   groups: readonly (JavaScriptRouteSourceFacts | undefined)[],
 ): JavaScriptRouteSourceFacts | undefined => {
@@ -171,7 +260,9 @@ const mergeRoutes = (
  * records whole-file analysis emits.
  * Degraded shards contribute no findings; they are named in the merged
  * limitations and force the examination status to limited, so their absence
- * is explicit rather than silent.
+ * is explicit rather than silent. A degraded module shard's identity is
+ * retained as salvage on the folded Metro registration, built only from
+ * its definition statement, so the module stays present-but-degraded.
  */
 export const mergeJavaScriptStaticAnalyses = (
   analyses: readonly JavaScriptStaticAnalysis[],
@@ -194,11 +285,14 @@ export const mergeJavaScriptStaticAnalyses = (
   const rpcExportProvenance = analyses.flatMap(
     ({ rpc_export_provenance }) => rpc_export_provenance ?? [],
   );
-  const registrations = uniqueSortedBy(
-    mergeMetroRegistrations(
-      analyses.flatMap(({ bundler_registrations }) => bundler_registrations),
+  const registrations = attachDegradedModuleSalvage(
+    uniqueSortedBy(
+      mergeMetroRegistrations(
+        analyses.flatMap(({ bundler_registrations }) => bundler_registrations),
+      ),
+      registrationKey,
     ),
-    registrationKey,
+    degraded,
   );
   const sourceMapUrls = orderedUnion(
     analyses.map(({ source_map_urls }) =>
@@ -273,9 +367,8 @@ export const mergeJavaScriptStaticAnalyses = (
     electron,
     limitations: [
       ...orderedUnion(analyses.map(({ limitations }) => limitations)),
-      ...degraded.map(
-        ({ moduleKey, reason }) =>
-          `Metro module ${moduleKey ?? "(prelude)"} was not fully analyzed: ${reason}`,
+      ...degraded.map(({ moduleKey, reason }) =>
+        javaScriptDegradedShardLimitation(moduleKey, reason),
       ),
     ],
   };

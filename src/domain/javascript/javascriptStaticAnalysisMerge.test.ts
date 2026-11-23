@@ -85,4 +85,100 @@ it("labels degraded shards as limited coverage, never as absent facts", () => {
   expect(merged.analysis_coverage?.semantics.unknown_findings).toBeGreaterThan(
     0,
   );
+  // Without definition-statement facts there is nothing to salvage from.
+  expect(merged.bundler_registrations[0]?.degraded_modules).toBeUndefined();
+});
+
+const LOCATION = {
+  start: { line: 3, column: 0 },
+  end: { line: 9, column: 2 },
+} as const;
+
+it("retains a budget-degraded module's identity as salvage on the folded registration", () => {
+  const parsed = parseJavaScriptSource(bundleSource, "bundle.js")!;
+  const partition = partitionMetroBundle(parsed.program)!;
+  const originalBody = parsed.program.body;
+  const analyses: JavaScriptStaticAnalysis[] = [];
+  const degradedShard = partition.shards.find(
+    ({ moduleKey }) => moduleKey === "7",
+  )!;
+  try {
+    for (const shard of partition.shards) {
+      if (shard.moduleKey === "7") continue;
+      parsed.program.body = [...shard.statements];
+      analyses.push(analyzeParsedJavaScriptStaticSource(bundleSource, parsed));
+    }
+  } finally {
+    parsed.program.body = originalBody;
+  }
+  const merged = mergeJavaScriptStaticAnalyses(analyses, [
+    {
+      moduleKey: "7",
+      reason: "budget exceeded",
+      definition: {
+        dependencyModuleKeys: degradedShard.dependencyModuleKeys,
+        sourceBytes: degradedShard.bytes,
+        location: LOCATION,
+        defineOffset: degradedShard.statements[0]!.start ?? 0,
+      },
+    },
+  ]);
+  expect(merged.bundler_registrations).toHaveLength(1);
+  const registration = merged.bundler_registrations[0]!;
+  expect(registration.bundler).toBe("metro");
+  // The nine analyzed modules keep their full facts; module 7 is not
+  // silently folded into them and carries no invented analysis content.
+  expect(
+    registration.modules.map(({ module_key }) => module_key),
+  ).not.toContain("7");
+  expect(registration.modules).toHaveLength(MODULE_COUNT - 1);
+  expect(registration.degraded_modules).toEqual([
+    {
+      module_key: "7",
+      dependency_module_keys: [],
+      source_bytes: degradedShard.bytes,
+      location: LOCATION,
+      reason: "budget exceeded",
+    },
+  ]);
+  expect(merged.limitations.join(" ")).toContain(
+    "Metro module 7 was not fully analyzed: budget exceeded",
+  );
+});
+
+it("retains salvage when no analyzed shard produced a Metro registration", () => {
+  const plain = analyzeParsedJavaScriptStaticSource(
+    "var answer = 42;",
+    parseJavaScriptSource("var answer = 42;", "plain.js")!,
+  );
+  expect(plain.bundler_registrations).toEqual([]);
+  const merged = mergeJavaScriptStaticAnalyses(
+    [plain],
+    [
+      {
+        moduleKey: "3",
+        reason: "budget exceeded",
+        definition: {
+          dependencyModuleKeys: ["4"],
+          sourceBytes: 512,
+          location: LOCATION,
+          defineOffset: 128,
+        },
+      },
+    ],
+  );
+  expect(merged.bundler_registrations).toHaveLength(1);
+  const registration = merged.bundler_registrations[0]!;
+  expect(registration.bundler).toBe("metro");
+  expect(registration.chunk_keys).toEqual(["metro@128"]);
+  expect(registration.modules).toEqual([]);
+  expect(registration.degraded_modules).toEqual([
+    {
+      module_key: "3",
+      dependency_module_keys: ["4"],
+      source_bytes: 512,
+      location: LOCATION,
+      reason: "budget exceeded",
+    },
+  ]);
 });

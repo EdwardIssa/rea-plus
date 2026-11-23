@@ -5,7 +5,10 @@ import { createHash } from "node:crypto";
 
 import type { ArtifactInventorySnapshot } from "../../domain/artifactInventorySnapshot.js";
 import type { JavaScriptArtifactFile } from "../../domain/javascript/javascriptArtifactFiles.js";
-import { analyzeJavaScriptStaticSource } from "../../domain/javascript/javascriptStaticAnalysis.js";
+import {
+  analyzeJavaScriptStaticSource,
+  analyzeParsedJavaScriptStaticSource,
+} from "../../domain/javascript/javascriptStaticAnalysis.js";
 import type {
   AnalyzedJavaScriptArtifactFile,
   JavaScriptArtifactAnalysis,
@@ -18,6 +21,12 @@ import {
   createJavaScriptArtifactRootNode,
 } from "./JavaScriptArtifactGraphStructure.js";
 import { addJavaScriptStaticFindingsSteps } from "./JavaScriptArtifactGraphFindings.js";
+import { addJavaScriptBundlerNodes } from "./JavaScriptArtifactGraphBundlers.js";
+import { parseJavaScriptSource } from "../../domain/javascript/javascriptSourceParser.js";
+import { partitionMetroBundle } from "../../domain/javascript/javascriptMetroBundlePartition.js";
+import { mergeJavaScriptStaticAnalyses } from "../../domain/javascript/javascriptStaticAnalysisMerge.js";
+import { range } from "../../domain/javascript/javascriptStaticAnalysisHelpers.js";
+import type { JavaScriptStaticAnalysis } from "../../domain/javascript/javascriptStaticAnalysisTypes.js";
 import { applicationContainerIdentity } from "./JavaScriptArtifactGraphContext.js";
 import { JavaScriptJsonDocuments } from "./JavaScriptJsonDocuments.js";
 
@@ -64,6 +73,7 @@ const analysisFor = (
   visited_ast_nodes: 0,
   findings: 0,
   modules: 0,
+  degraded_modules: 0,
   parse_failures: 0,
   limitations: [],
 });
@@ -520,5 +530,116 @@ it("projects package parse status from the package observation", () => {
     file_kind: "package-json",
     package_parse_status: "included",
     json_parse_status: null,
+  });
+});
+
+const SALVAGE_BUNDLE = [
+  "var registry = {};",
+  ...Array.from(
+    { length: 10 },
+    (_, i) =>
+      `__d(function (global, require, module, exports) { exports.value = ${String(i)}; }, ${String(i)}, [${String((i + 1) % 10)}]);`,
+  ),
+  "__r(0);",
+].join("\n");
+
+/** Merge per-shard analyses with module 7 degraded, as the worker does. */
+const degradedBundleAnalysis = (): JavaScriptStaticAnalysis => {
+  const parsed = parseJavaScriptSource(SALVAGE_BUNDLE, "bundle.js")!;
+  const partition = partitionMetroBundle(parsed.program)!;
+  const originalBody = parsed.program.body;
+  const analyses: JavaScriptStaticAnalysis[] = [];
+  const degradedShard = partition.shards.find(
+    ({ moduleKey }) => moduleKey === "7",
+  )!;
+  try {
+    for (const shard of partition.shards) {
+      if (shard.moduleKey === "7") continue;
+      parsed.program.body = [...shard.statements];
+      analyses.push(
+        analyzeParsedJavaScriptStaticSource(SALVAGE_BUNDLE, parsed),
+      );
+    }
+  } finally {
+    parsed.program.body = originalBody;
+  }
+  return mergeJavaScriptStaticAnalyses(analyses, [
+    {
+      moduleKey: "7",
+      reason:
+        "static analysis exceeded its per-module time budget of 2000 ms; the module's facts remain unknown",
+      definition: {
+        dependencyModuleKeys: degradedShard.dependencyModuleKeys,
+        sourceBytes: degradedShard.bytes,
+        location: range(degradedShard.statements[0]!),
+        defineOffset: degradedShard.statements[0]!.start ?? 0,
+      },
+    },
+  ]);
+};
+
+describe("degraded bundler module salvage", () => {
+  it("projects a budget-degraded module as present-but-degraded", () => {
+    const file: JavaScriptArtifactFile = {
+      path: "bundle.js",
+      container_sha256: SHA256,
+      sha256: SHA256,
+      bytes: SALVAGE_BUNDLE.length,
+      inventory_artifact_id: `art_${SHA256}`,
+      kind: "javascript",
+      unpacked: false,
+      text: { included: true, value: SALVAGE_BUNDLE },
+    };
+    const context = contextFor(
+      file,
+      analysisFor([
+        { file, javascript: degradedBundleAnalysis(), semantic: null },
+      ]),
+    );
+    addJavaScriptArtifactFiles(context);
+    addJavaScriptBundlerNodes(context);
+    const nodes = context.accumulator.nodes();
+    const chunk = nodes.find(({ kind }) => kind === "javascript-chunk");
+    expect(chunk).toBeDefined();
+    // The chunk counts the degraded module as present.
+    expect(chunk!.observations[0]!.properties.module_count).toBe(10);
+    const module7 = nodes.find(
+      (node) =>
+        node.kind === "javascript-module" &&
+        "namespace" in node.identity &&
+        node.identity.namespace === "metro:module" &&
+        node.identity.key === "7",
+    );
+    expect(module7).toBeDefined();
+    const properties = module7!.observations[0]!.properties;
+    expect(properties.analysis_status).toBe("degraded");
+    expect(properties.dependency_module_keys).toEqual(["8"]);
+    expect(properties.source_bytes).toBeGreaterThan(0);
+    // No analysis content is invented for the salvaged module.
+    expect(properties).not.toHaveProperty("exports");
+    expect(properties).not.toHaveProperty("source_sha256");
+    expect(properties).not.toHaveProperty("structural_fingerprint_sha256");
+    // The analyzed modules carry no degraded marker.
+    const module6 = nodes.find(
+      (node) =>
+        node.kind === "javascript-module" &&
+        "key" in node.identity &&
+        node.identity.key === "6",
+    );
+    expect(module6!.observations[0]!.properties).not.toHaveProperty(
+      "analysis_status",
+    );
+    // The chunk contains the salvaged module, and references resolve to it.
+    expect(
+      context.accumulator
+        .edges()
+        .some(
+          (edge) =>
+            edge.relation === "contains" &&
+            edge.source_node_id === chunk!.node_id &&
+            edge.target_node_id === module7!.node_id,
+        ),
+    ).toBe(true);
+    expect([...context.moduleNodes.values()]).toContain(module7);
   });
 });

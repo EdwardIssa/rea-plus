@@ -202,3 +202,47 @@ it("preserves scoped IPC receiver provenance and rejects malformed scope metadat
     ).toBe(false);
   }
 });
+
+it("transfers degraded-module salvage across the worker boundary", () => {
+  const facts = analyzeJavaScriptStaticSource(
+    [
+      "var registry = {};",
+      "__d(function (global, require, module, exports) { exports.v = 1; }, 0, []);",
+      "__r(0);",
+    ].join("\n"),
+  );
+  const withSalvage = {
+    ...facts,
+    bundler_registrations: facts.bundler_registrations.map((registration) => ({
+      ...registration,
+      degraded_modules: [
+        {
+          module_key: "7",
+          dependency_module_keys: ["8", "9"],
+          source_bytes: 129004,
+          location: {
+            start: { line: 23, column: 4 },
+            end: { line: 33, column: 128699 },
+          },
+          reason: "budget exceeded",
+        },
+        {
+          module_key: "9",
+          dependency_module_keys: null,
+          source_bytes: 512,
+          location: {
+            start: { line: 40, column: 0 },
+            end: { line: 41, column: 10 },
+          },
+          reason: "budget exceeded",
+        },
+      ],
+    })),
+  };
+  const parsed = javaScriptWorkerStaticAnalysisSchema.parse(
+    JSON.parse(JSON.stringify(withSalvage)) as unknown,
+  );
+  expect(parsed.bundler_registrations[0]?.degraded_modules).toEqual(
+    withSalvage.bundler_registrations[0]?.degraded_modules,
+  );
+});
