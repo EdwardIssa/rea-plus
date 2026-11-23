@@ -1195,6 +1195,7 @@
 * **javascript:** cross-shard RPC join matrix and sharded parity fixture ([b5e8c76](https://github.com/EdwardIssa/rea-plus/commit/b5e8c765da046c972d7bb4eee0a751cce4be6782))
 * **javascript:** object-form dependency map parity fixtures ([c9adb67](https://github.com/EdwardIssa/rea-plus/commit/c9adb6759733624c7fe529b5cbb6c9e37d564201))
 * **javascript:** pin bundler recovery bookkeeping with scenario fixtures ([42475c4](https://github.com/EdwardIssa/rea-plus/commit/42475c4971d4ac440956b1d3875a25e967880956))
+* **javascript:** pin endpoint inspection and partial-endpoint finishing with scenario fixtures ([18e14b0](https://github.com/EdwardIssa/rea-plus/commit/18e14b02fe3a9f29c6a519035eedc480fa10c81f))
 * **javascript:** pin Metro partition guards and byte bookkeeping with scenario fixtures ([c117f8d](https://github.com/EdwardIssa/rea-plus/commit/c117f8d879ea2ce080749cc7547239e5da88a60f))
 * **javascript:** pin parent result-budget truncation markers and resume cursor ([8cf3c09](https://github.com/EdwardIssa/rea-plus/commit/8cf3c097c1c9ef57a3ffbf760972d20669584344))
 * **javascript:** pin shard-merge bookkeeping with scenario fixtures ([65e0051](https://github.com/EdwardIssa/rea-plus/commit/65e0051ab42c6634c0e324a073d2ba38e4b2f14b))
