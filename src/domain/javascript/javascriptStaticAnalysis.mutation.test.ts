@@ -447,6 +447,56 @@ it("collects Metro exports declared through the factory require's d helper", () 
   ]);
 });
 
+it("collects Metro exports declared only through the factory require's d helper", () => {
+  // Kills the 203:7 ConditionalExpression -> false survivor. The
+  // export collector recognizes a factory's nested loader `d` call
+  // as an export definition only when member-mutation effects are
+  // indexed. A factory whose only export mechanism is that call
+  // contains no write site the ambient walk observes (the call is
+  // an opaque invocation to the identity-writes walk), so
+  // delegate-write eligibility is never marked and the early drive
+  // of the facts pass is skipped; the traversal still sets the
+  // factory-loader flag from the same call (its loader binding is
+  // registered by the module inspector), so the gated drive before
+  // finishBundlerExports is the only pass run that can precede the
+  // collector. Forcing the gate off loses the declared export
+  // (finalized exports [] instead of ["only"]), measured over a
+  // 16-source oracle battery that also covered the multi-key,
+  // nested-IIFE, no-entry, two-module, computed-callee, and
+  // write-carrying variants. The forced-on variant separated none
+  // of the 16: a collector-recognized `d` call is always observed
+  // by the traversal that sets the flag, so with the flag unset
+  // there is no `d`-declared export for an early pass run to add.
+  // The pin above does not separate the mutant: its direct
+  // `e.member = 1` write marks eligibility, so the early drive
+  // covers it — the eligibility claim in its comment holds only
+  // for factories that also carry an observed write.
+  const result = analyzeJavaScriptStaticSource(
+    "__d(function (g, r, i, a, m, e, d) { r.d(e, {only: () => 1}); }, 17, []); __r(17);",
+  );
+  expect(result.bundler_registrations).toHaveLength(1);
+  expect(result.bundler_registrations[0]?.modules[0]?.exports).toEqual([
+    "only",
+  ]);
+});
+
+it("collects webpack exports declared only through the factory require's d helper", () => {
+  // The webpack chunk-push recovery produces the same pending
+  // export shape as the Metro pin above: a factory whose exports
+  // are declared solely by the nested loader `d` call, with no
+  // observed write site anywhere in the program, so the gated
+  // facts-pass drive at 203 is again the only run before
+  // finishBundlerExports. Forcing the gate off loses the declared
+  // export ([] instead of ["wonly"]).
+  const result = analyzeJavaScriptStaticSource(
+    'globalThis.webpackChunkApp.push([[1], { "factory": function (module, exports, __webpack_require__) { __webpack_require__.d(exports, {wonly: () => 1}); } }]);',
+  );
+  expect(result.bundler_registrations).toHaveLength(1);
+  expect(result.bundler_registrations[0]?.modules[0]?.exports).toEqual([
+    "wonly",
+  ]);
+});
+
 it("reports multiple semantic resource limits in sorted order", () => {
   // Pins the reported pair and its order. Note: through this entry
   // point the alias budget is spent while the branching require
