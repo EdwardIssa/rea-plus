@@ -2,7 +2,7 @@
 ---
 
 
-## [6.9.0](https://github.com/EdwardIssa/rea-plus/compare/rea-agents-6.8.0...rea-agents-6.9.0) (2026-11-23)
+## [6.9.0](https://github.com/EdwardIssa/rea-plus/compare/rea-agents-6.8.0...rea-agents-6.9.0) (2026-11-24)
 
 
 ### ⚠ BREAKING CHANGES
@@ -1191,12 +1191,19 @@
 * **ghidra:** expect carved MIPS copies to be refused at target opening ([#8227](https://github.com/EdwardIssa/rea-plus/issues/8227)) ([091892d](https://github.com/EdwardIssa/rea-plus/commit/091892dfedd9f50cc68c7bbb63e44d5ca1754fcb))
 * guard target format vocabularies and DOL snapshot saves ([#7481](https://github.com/EdwardIssa/rea-plus/issues/7481)) ([54756ff](https://github.com/EdwardIssa/rea-plus/commit/54756ff24e1f4c2e47554f61ea5efe57bab27b64))
 * **hopper:** verify bootstrap cleanup ownership ([c79bd41](https://github.com/EdwardIssa/rea-plus/commit/c79bd41b5d6d65b7b2a9b6e0b58d376fc36910d6))
+* **javascript:** add long-timeout Stryker variant configs for timeout-conversion measurement ([be67ce6](https://github.com/EdwardIssa/rea-plus/commit/be67ce6c0a2912d2019add317c555abc7f5d252b))
 * **javascript:** add Stryker mutation testing for the JavaScript domain ([14792a2](https://github.com/EdwardIssa/rea-plus/commit/14792a2131d9575e376ab596209996ae4cb43ba1))
 * **javascript:** cover Request endpoint identity and provenance ([#6365](https://github.com/EdwardIssa/rea-plus/issues/6365)) ([09c889b](https://github.com/EdwardIssa/rea-plus/commit/09c889b3b5c6df26c47565cc1b8fcad8864c8710))
 * **javascript:** cross-shard RPC join matrix and sharded parity fixture ([b5e8c76](https://github.com/EdwardIssa/rea-plus/commit/b5e8c765da046c972d7bb4eee0a751cce4be6782))
+* **javascript:** kill the 203:7 gate survivor via d-only factory exports ([b793523](https://github.com/EdwardIssa/rea-plus/commit/b793523bcd86d6007a3b039f20a2ebb0ab46edb7))
+* **javascript:** kill the 264:26 sort-drop survivor via producer insertion order ([bf1ac3b](https://github.com/EdwardIssa/rea-plus/commit/bf1ac3b0a868e8ce3518ab8a67c6a7f929aed634))
 * **javascript:** object-form dependency map parity fixtures ([c9adb67](https://github.com/EdwardIssa/rea-plus/commit/c9adb6759733624c7fe529b5cbb6c9e37d564201))
 * **javascript:** pin bundler recovery bookkeeping with scenario fixtures ([42475c4](https://github.com/EdwardIssa/rea-plus/commit/42475c4971d4ac440956b1d3875a25e967880956))
+* **javascript:** pin deferred GraphQL endpoint order and finisher guard behavior for range 92-250 survivors ([41a620d](https://github.com/EdwardIssa/rea-plus/commit/41a620dd2f286210f77d2f16619cab4f682e06cf))
 * **javascript:** pin endpoint inspection and partial-endpoint finishing with scenario fixtures ([18e14b0](https://github.com/EdwardIssa/rea-plus/commit/18e14b02fe3a9f29c6a519035eedc480fa10c81f))
+* **javascript:** pin finalize behaviors exposed by long-timeout conversion of range 251-353 ([79fe71b](https://github.com/EdwardIssa/rea-plus/commit/79fe71bbacfad6f3361207a6aa5b34b3c6cba505))
+* **javascript:** pin finalize output and RPC fact retention with scenario fixtures ([06e529b](https://github.com/EdwardIssa/rea-plus/commit/06e529b397d8411089f05f88730a382764c5f68b))
+* **javascript:** pin finalized field omission and Metro loader exports for range 354-504 survivors ([20a2463](https://github.com/EdwardIssa/rea-plus/commit/20a246377fce5bbf9c4cb078d1d91dac618abd49))
 * **javascript:** pin Metro partition guards and byte bookkeeping with scenario fixtures ([c117f8d](https://github.com/EdwardIssa/rea-plus/commit/c117f8d879ea2ce080749cc7547239e5da88a60f))
 * **javascript:** pin parent result-budget truncation markers and resume cursor ([8cf3c09](https://github.com/EdwardIssa/rea-plus/commit/8cf3c097c1c9ef57a3ffbf760972d20669584344))
 * **javascript:** pin shard-merge bookkeeping with scenario fixtures ([65e0051](https://github.com/EdwardIssa/rea-plus/commit/65e0051ab42c6634c0e324a073d2ba38e4b2f14b))
