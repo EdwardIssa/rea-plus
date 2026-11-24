@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 
 import { analyzeJavaScriptStaticSource } from "./javascriptStaticAnalysis.js";
+import { aliasSelectionBudgetSource } from "../../../tests/fixtures/javascriptAliasSelectionBudget.js";
 
 // Scenario tests for the analyze/finalize behaviors in
 // javascriptStaticAnalysis.ts (lines 92-504) that the Stryker pilot
@@ -301,4 +302,98 @@ it("records no endpoint for a call in an abstract class field's computed key", (
     'abstract class A { abstract [fetch("/key")]: string; }',
   );
   expect(result.endpoints).toEqual([]);
+});
+
+// Follow-up fixtures for the survivors the long-timeout run of range
+// 251-353 exposed (all 14 were pilot timeouts before conversion): the
+// finalized resource-limit sort, the dynamic-findings uncertainty
+// conjuncts, the examination-limited disjunction and the Electron
+// call-path flag, the Metro emission condition, and the bundled
+// Electron call-path limitation entry. Each fixture makes one of
+// those finalize behaviors observable in the finalized output.
+
+it("reports no dynamic-findings uncertainty when nothing is unknown", () => {
+  const result = analyzeJavaScriptStaticSource("const value = 1;");
+  expect(result.analysis_coverage?.semantics.unknown_findings).toBe(0);
+  expect(result.analysis_coverage?.semantics.uncertainty).toEqual([]);
+});
+
+it("emits no bundler registration for a plain source", () => {
+  const result = analyzeJavaScriptStaticSource("const value = 1;");
+  expect(result.bundler_registrations).toEqual([]);
+});
+
+it("emits no Metro registration for a dynamic entry call with no modules", () => {
+  // The entry call records a Metro location but no entry key and no
+  // module; the emission condition must stay false on both counts.
+  const result = analyzeJavaScriptStaticSource("__r(dynamicName);");
+  expect(result.bundler_registrations).toEqual([]);
+});
+
+it("reports the bundled Electron call-path limitation", () => {
+  const result = analyzeJavaScriptStaticSource(
+    [
+      'const { contextBridge, ipcRenderer } = require("electron");',
+      'contextBridge.exposeInMainWorld("api", { ping: () => ipcRenderer.invoke("ping") });',
+    ].join("\n"),
+  );
+  expect(result.electron.call_paths).toHaveLength(1);
+  expect(result.limitations).toEqual([
+    "Bundled Electron call paths use static argument and closure substitutions. Conditions, ambient helper overrides, runtime reachability and arbitrary side effects remain unproven.",
+    "Electron API identity follows proven lexical module aliases and structurally verified module-namespace interop. Other reassignments, dynamic selections, and visibly overwritten namespace members are unresolved; missing findings do not establish absence. Arbitrary call side effects and runtime registration are not evaluated.",
+    "JavaScript syntax was parsed as data and was never evaluated.",
+  ]);
+});
+
+it("flags examination as limited when Electron wrapper expansion hits its budget", () => {
+  // Nested bridge members past the depth-128 expansion budget: the
+  // limit flag, not a semantic resource limit, drives the status.
+  let inner = 'leaf: () => ipcRenderer.invoke("deep")';
+  for (let level = 0; level < 140; level++) inner = `level: { ${inner} }`;
+  const result = analyzeJavaScriptStaticSource(
+    [
+      'const { contextBridge, ipcRenderer } = require("electron");',
+      `contextBridge.exposeInMainWorld("api", { ${inner} });`,
+    ].join("\n"),
+  );
+  expect(result.analysis_coverage?.examination).toEqual({
+    status: "limited",
+    semantic_resource_limits: [],
+    electron_call_paths_limited: true,
+  });
+  expect(result.limitations).toContain(
+    "Electron wrapper expansion reached its resource budget (1000000 visits/substitutions or depth 128); additional paths remain unknown.",
+  );
+});
+
+it("reports examination as limited from a semantic resource limit alone", () => {
+  // 300 erased `as` wrappers exceed the expression-depth budget of
+  // 256 when the value's provenance is queried at the fetch call.
+  const result = analyzeJavaScriptStaticSource(
+    `const v = 1${" as unknown".repeat(300)}; fetch(v);`,
+  );
+  expect(result.analysis_coverage?.examination).toEqual({
+    status: "limited",
+    semantic_resource_limits: ["expression-depth"],
+    electron_call_paths_limited: false,
+  });
+});
+
+it("reports multiple semantic resource limits in sorted order", () => {
+  // Pins the reported pair and its order. Note: through this entry
+  // point the alias budget is spent while the branching require
+  // receiver is processed, ahead of every traversal/finisher spend
+  // probed (cast-chain depth, giant-string bytes, union candidates,
+  // in both source orders), so insertion order matched sorted order
+  // in every arrangement and the sort-drop mutant at 264:26 is not
+  // separated by this fixture — see the lane report for the argued
+  // verdict and the oracle measurements behind it.
+  const source = [
+    `const v = 1${" as unknown".repeat(300)}; fetch(v);`,
+    aliasSelectionBudgetSource(),
+  ].join("\n");
+  const result = analyzeJavaScriptStaticSource(source);
+  expect(
+    result.analysis_coverage?.examination.semantic_resource_limits,
+  ).toEqual(["alias-selections", "expression-depth"]);
 });
