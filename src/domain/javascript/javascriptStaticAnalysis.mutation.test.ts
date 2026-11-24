@@ -465,3 +465,90 @@ it("reports multiple semantic resource limits in sorted order", () => {
     result.analysis_coverage?.examination.semantic_resource_limits,
   ).toEqual(["alias-selections", "expression-depth"]);
 });
+
+it("joins deferred GraphQL source operations after traversal endpoints", () => {
+  // The operation inside a graphql-js Source object is owned by
+  // that object during traversal and is only joined by the RPC
+  // scan's finish, after the fetch endpoint recorded during the
+  // walk, so the finalized order is traversal-then-deferred even
+  // though the operation sits earlier in the source. The pending
+  // network and sqlite lists are both empty here, so this order
+  // also pins the guards at 213/214: when either guard is weakened
+  // the partial-endpoint finisher runs anyway and its offset sort
+  // moves the deferred operation ahead of the fetch endpoint.
+  const result = analyzeJavaScriptStaticSource(
+    [
+      'const source = { body: "query EarlyOp { viewer { id } }", name: "GraphQL request", locationOffset: { line: 1, column: 1 } };',
+      'fetch("https://api.example.test/data");',
+    ].join("\n"),
+  );
+  expect(result.endpoints.map(({ value }) => value)).toEqual([
+    "https://api.example.test/data",
+    "EarlyOp",
+  ]);
+});
+
+it("keeps finalized references in source order across reference kinds", () => {
+  // Pins the reference order the module-require finisher's offset
+  // sort would preserve. Note: this fixture does not separate the
+  // guard mutants at 208:7 — every reference appender runs during
+  // the pre-order traversal (imports, re-exports, requires,
+  // dynamic imports, import-equals), so the collection reaches
+  // the guard already ordered by node start, and the finisher's
+  // stable sort is the identity on it whether or not the guard
+  // lets the finisher run with an empty pending list. See the
+  // survivor inventory for the argued verdict.
+  const result = analyzeJavaScriptStaticSource(
+    [
+      'import fs from "fs";',
+      'export { x } from "./re.js";',
+      'const a = require("./a.js");',
+      "__d(function (global, require, module, exports) {",
+      "  var e = require(1);",
+      "}, 2, [1]);",
+      'import("./dyn.js");',
+      'const b = require("./b.js");',
+      'import dep = require("./dep.js");',
+    ].join("\n"),
+  );
+  expect(
+    result.references.map(({ kind, specifier, location }) => ({
+      kind,
+      specifier,
+      line: location.start.line,
+    })),
+  ).toEqual([
+    { kind: "static-import", specifier: "fs", line: 1 },
+    { kind: "static-import", specifier: "./re.js", line: 2 },
+    { kind: "require", specifier: null, line: 3 },
+    { kind: "require", specifier: "1", line: 5 },
+    { kind: "dynamic-import", specifier: "./dyn.js", line: 7 },
+    { kind: "require", specifier: null, line: 8 },
+    { kind: "require", specifier: "./dep.js", line: 9 },
+  ]);
+});
+
+it("leaves a mutation-built bridge exposure without call paths", () => {
+  // Pins the production outcome behind the other half of the
+  // 208:7 guard: with no pending module-require calls, the block
+  // the guard protects would only add a member-mutation facts
+  // pass ahead of the call-path collection. That pass is guarded
+  // per state, and in this pipeline its recorded effects are
+  // consumed after the guard only by finishers that re-run it
+  // first (the 213 block) or not at all (the call-path collector
+  // never queries reference effects), so an exposure assembled
+  // by member writes finalizes the same whether the pass is
+  // driven at the guard or left undriven. Measured identical
+  // full output under both guard mutants across the probe
+  // battery; see the survivor inventory for the argued verdict
+  // and its stated limits.
+  const result = analyzeJavaScriptStaticSource(
+    [
+      'const { contextBridge, ipcRenderer } = require("electron");',
+      "const api = {};",
+      'api.ping = () => ipcRenderer.invoke("ping");',
+      'contextBridge.exposeInMainWorld("api", api);',
+    ].join("\n"),
+  );
+  expect(result.electron.call_paths).toBeUndefined();
+});
