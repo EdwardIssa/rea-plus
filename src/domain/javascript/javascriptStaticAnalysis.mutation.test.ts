@@ -552,3 +552,26 @@ it("leaves a mutation-built bridge exposure without call paths", () => {
   );
   expect(result.electron.call_paths).toBeUndefined();
 });
+
+it("reports semantic resource limits sorted when producers spend out of order", () => {
+  // Kills the sort-drop mutant at 264:26. The earlier equivalence
+  // argument held only for pairs involving the alias-selections
+  // budget, which is spent during classification, ahead of the
+  // traversal-phase spends. The other producers insert among
+  // themselves in evaluation order: the concatenated 200k string
+  // spends "primitive-bytes" when its value is queried at the
+  // first fetch, and the 300-deep cast chain spends
+  // "expression-depth" at the second fetch, so insertion order is
+  // reverse-sorted and only the .sort() at finalize puts the
+  // reported pair in sorted order. A producer audit confirmed the
+  // separation against the hand-applied mutant (finalized arrays
+  // ["primitive-bytes", "expression-depth"] under the mutant).
+  const source = [
+    `const s = "${"x".repeat(200000)}" + "y"; fetch(s);`,
+    `const v = 1${" as unknown".repeat(300)}; fetch(v);`,
+  ].join("\n");
+  const result = analyzeJavaScriptStaticSource(source);
+  expect(
+    result.analysis_coverage?.examination.semantic_resource_limits,
+  ).toEqual(["expression-depth", "primitive-bytes"]);
+});
