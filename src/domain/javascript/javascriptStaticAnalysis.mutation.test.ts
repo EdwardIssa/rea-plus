@@ -379,6 +379,74 @@ it("reports examination as limited from a semantic resource limit alone", () => 
   });
 });
 
+it("omits rpc_candidates from the finalized output when none were recorded", () => {
+  // The conditional spread must stay load-bearing: a source that
+  // records client members but no cross-shard candidates finalizes
+  // without the candidates field at all, not with an empty list.
+  const result = analyzeJavaScriptStaticSource(
+    [
+      "const publishers = {};",
+      'publishers.alpha = createClient("https://example.test", "k");',
+    ].join("\n"),
+  );
+  expect(result.rpc_client_members).toHaveLength(1);
+  expect("rpc_candidates" in result).toBe(false);
+});
+
+it("omits rpc_client_members from the finalized output when none were recorded", () => {
+  const result = analyzeJavaScriptStaticSource(
+    [
+      "__d(function (global, require, module, exports) {",
+      "  var e = require(1);",
+      '  e.supabase.rpc("first_proc");',
+      "}, 2, [1]);",
+    ].join("\n"),
+  );
+  expect(result.rpc_candidates).toHaveLength(1);
+  expect("rpc_client_members" in result).toBe(false);
+});
+
+it("omits rpc_export_provenance from the finalized output when none was recorded", () => {
+  const result = analyzeJavaScriptStaticSource("const value = 1;");
+  expect("rpc_export_provenance" in result).toBe(false);
+});
+
+it("omits electron app_path_changes when no app path was changed", () => {
+  // Electron is observed and call paths finalize, but no app path
+  // change was recorded, so the field stays out of the electron
+  // section entirely.
+  const result = analyzeJavaScriptStaticSource(
+    [
+      'const { contextBridge, ipcRenderer } = require("electron");',
+      'contextBridge.exposeInMainWorld("api", { ping: () => ipcRenderer.invoke("ping") });',
+    ].join("\n"),
+  );
+  expect(result.electron.call_paths).toHaveLength(1);
+  expect("app_path_changes" in result.electron).toBe(false);
+});
+
+it("collects Metro exports declared through the factory require's d helper", () => {
+  // Pins the production behavior behind the finalize gate on the
+  // factory-loader flag: the declared export is collected in the
+  // finalized registration. Note: this fixture does not separate
+  // the gate mutants at 471:7 — the member-mutation facts pass is
+  // idempotent per state and is driven earlier by the delegate-write
+  // eligibility check whenever the program's calls are observed by
+  // the ambient-writes walk, which every registration idiom
+  // produces; in 17 probed arrangements (webpack and Metro, direct,
+  // aliased, nested, and relocated d calls) the finalized output was
+  // identical with the gate forced on, forced off, and inverted.
+  // See the survivor inventory for the argued verdict.
+  const result = analyzeJavaScriptStaticSource(
+    "__d(function (g, r, i, a, m, e, d) { r.d(e, {declared: () => 1}); e.member = 1; }, 17, []); __r(17);",
+  );
+  expect(result.bundler_registrations).toHaveLength(1);
+  expect(result.bundler_registrations[0]?.modules[0]?.exports).toEqual([
+    "declared",
+    "member",
+  ]);
+});
+
 it("reports multiple semantic resource limits in sorted order", () => {
   // Pins the reported pair and its order. Note: through this entry
   // point the alias budget is spent while the branching require
