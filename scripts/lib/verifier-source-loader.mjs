@@ -9,6 +9,9 @@ const sourceRoots = [
 ];
 let hooks;
 
+const pinnedNodeMessage =
+  "This REA source loader requires the Node.js version pinned in .nvmrc; run nvm use and invoke source build and verifier scripts with node and npm. Installed REA packages have separate runtime support.";
+
 const ownedSourcePath = (url) => {
   if (!url.startsWith("file:")) return undefined;
   const path = fileURLToPath(url);
@@ -92,14 +95,20 @@ const loadSource = (url, context, nextLoad) => {
   else if (loaded.source instanceof ArrayBuffer)
     source = Buffer.from(loaded.source).toString("utf8");
   else throw new TypeError(`Verifier module source was unavailable: ${url}`);
-  return {
-    ...loaded,
-    format,
-    source: nodeModule.stripTypeScriptTypes(source, {
+  let stripped;
+  try {
+    stripped = nodeModule.stripTypeScriptTypes(source, {
       mode: "transform",
       sourceMap: true,
       sourceUrl: url,
-    }),
+    });
+  } catch (cause) {
+    throw new Error(pinnedNodeMessage, { cause });
+  }
+  return {
+    ...loaded,
+    format,
+    source: stripped,
   };
 };
 
@@ -113,9 +122,7 @@ export const importVerifierSource = async (url, parent) => {
     typeof nodeModule.registerHooks !== "function" ||
     typeof nodeModule.stripTypeScriptTypes !== "function"
   )
-    throw new Error(
-      "This REA source loader requires the Node.js version pinned in .nvmrc; run nvm use and invoke source build and verifier scripts with node and npm. Installed REA packages have separate runtime support.",
-    );
+    throw new Error(pinnedNodeMessage);
   hooks ??= nodeModule.registerHooks({
     resolve: resolveSource,
     load: loadSource,
