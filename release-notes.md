@@ -2,7 +2,7 @@
 ---
 
 
-## [6.9.0](https://github.com/EdwardIssa/rea-plus/compare/rea-agents-6.8.0...rea-agents-6.9.0) (2026-11-24)
+## [6.9.0](https://github.com/EdwardIssa/rea-plus/compare/rea-agents-6.8.0...rea-agents-6.9.0) (2026-11-25)
 
 
 ### ⚠ BREAKING CHANGES
@@ -809,6 +809,7 @@
 * **rizin:** retain rejected debugger shutdowns ([0793b6c](https://github.com/EdwardIssa/rea-plus/commit/0793b6c3ca7ae329fe4e024b20d2da916deae6bf))
 * **runtime:** preserve exact selected target identities ([44b716f](https://github.com/EdwardIssa/rea-plus/commit/44b716f2f288ae3416e076d4aa5c2809533d1c7b))
 * **rust:** state inflate limits on the consumed zlib stream ([#8835](https://github.com/EdwardIssa/rea-plus/issues/8835)) ([6c3c5eb](https://github.com/EdwardIssa/rea-plus/commit/6c3c5ebc69c408f938ec200b58c8876548fed2c6))
+* **scripts:** surface the pinned-Node message when TS transform mode is unavailable (REA self-pass 2026-11-24) ([7124b42](https://github.com/EdwardIssa/rea-plus/commit/7124b42a14515ad19b7291d7121374c864dbae59))
 * **search:** clarify regex diagnostics and recovery ([#8776](https://github.com/EdwardIssa/rea-plus/issues/8776)) ([63b66fa](https://github.com/EdwardIssa/rea-plus/commit/63b66fa4981ee7688ac39492bca29ff89d0b120e))
 * **server:** preserve cleanup failure diagnostics ([7cc33fc](https://github.com/EdwardIssa/rea-plus/commit/7cc33fcf7ea7c8568f676eed6007c7749bf260f1))
 * **session:** align resource-only status and snapshot recovery ([#7896](https://github.com/EdwardIssa/rea-plus/issues/7896)) ([845080a](https://github.com/EdwardIssa/rea-plus/commit/845080aef61b4e1b0d051da8f873f4cd00d20f1b))
