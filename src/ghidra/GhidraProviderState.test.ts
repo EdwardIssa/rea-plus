@@ -8,18 +8,29 @@ import type { GhidraInstallationInspection } from "./GhidraInstallation.js";
 
 describe("ghidraProviderState", () => {
   it("reports absent whenever the installation is unavailable", () => {
-    for (const activity of ["none", "starting", "analyzing", "settled"] as const)
-      expect(ghidraProviderState({ installationAvailable: false, activity })).toBe(
-        "absent",
-      );
+    for (const activity of [
+      "none",
+      "starting",
+      "analyzing",
+      "settled",
+    ] as const)
+      expect(
+        ghidraProviderState({ installationAvailable: false, activity }),
+      ).toBe("absent");
   });
 
   it("reports loading while a worker is starting or analyzing", () => {
     expect(
-      ghidraProviderState({ installationAvailable: true, activity: "starting" }),
+      ghidraProviderState({
+        installationAvailable: true,
+        activity: "starting",
+      }),
     ).toBe("loading");
     expect(
-      ghidraProviderState({ installationAvailable: true, activity: "analyzing" }),
+      ghidraProviderState({
+        installationAvailable: true,
+        activity: "analyzing",
+      }),
     ).toBe("loading");
   });
 

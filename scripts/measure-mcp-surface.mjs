@@ -25,10 +25,7 @@ const analysis = {
 };
 
 const measure = async (label, environment) => {
-  const server = createServer(
-    { kind: "fixed", analysis },
-    { environment },
-  );
+  const server = createServer({ kind: "fixed", analysis }, { environment });
   const client = new Client({ name: "rea-surface-measure", version: "0" });
   const [clientTransport, serverTransport] =
     InMemoryTransport.createLinkedPair();

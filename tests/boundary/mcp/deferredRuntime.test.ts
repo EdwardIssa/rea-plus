@@ -610,33 +610,29 @@ console.log("LATE_PUBLICATION_REFUSED");
 it.each([
   { REA_MCP_TOOL_SURFACE: "full" },
   { REA_MCP_OUTPUT_SCHEMA_PROFILE: "off", REA_MCP_TOOL_SURFACE: "full" },
-])(
-  "preserves the configured catalog profile %j",
-  async (environment) => {
-    const { client } = await connect("legacy", environment);
-    const before = await client.listTools();
-    const catalog = JSON.parse(await readFile("dist/mcp-catalog.json", "utf8"));
-    expect(before.tools).toHaveLength(catalog.tools.length);
-    const expected =
-      environment.REA_MCP_OUTPUT_SCHEMA_PROFILE === "off"
-        ? catalog.tools.map(
-            ({ outputSchema: _output, ...tool }: Record<string, unknown>) =>
-              tool,
-          )
-        : catalog.tools;
-    expect(before.tools).toEqual(expected);
-    const toolDefinition = before.tools.find(
-      ({ name }) => name === "list_unknowns",
-    );
-    if (toolDefinition === undefined) throw new Error("Missing list_unknowns");
-    const result = await client.callTool(
-      { name: "list_unknowns", arguments: {} },
-      { toolDefinition },
-    );
-    expect(result.isError).not.toBe(true);
-    expect(await client.listTools()).toEqual(before);
-  },
-);
+])("preserves the configured catalog profile %j", async (environment) => {
+  const { client } = await connect("legacy", environment);
+  const before = await client.listTools();
+  const catalog = JSON.parse(await readFile("dist/mcp-catalog.json", "utf8"));
+  expect(before.tools).toHaveLength(catalog.tools.length);
+  const expected =
+    environment.REA_MCP_OUTPUT_SCHEMA_PROFILE === "off"
+      ? catalog.tools.map(
+          ({ outputSchema: _output, ...tool }: Record<string, unknown>) => tool,
+        )
+      : catalog.tools;
+  expect(before.tools).toEqual(expected);
+  const toolDefinition = before.tools.find(
+    ({ name }) => name === "list_unknowns",
+  );
+  if (toolDefinition === undefined) throw new Error("Missing list_unknowns");
+  const result = await client.callTool(
+    { name: "list_unknowns", arguments: {} },
+    { toolDefinition },
+  );
+  expect(result.isError).not.toBe(true);
+  expect(await client.listTools()).toEqual(before);
+});
 
 it("runs the real static artifact workflow after deferred initialization", async () => {
   const { client } = await connect("legacy");

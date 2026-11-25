@@ -271,9 +271,7 @@ const overheadBenchmark = async () => {
         }
       }
       for (const [name, args] of TASK_CALLS)
-        await client
-          .callTool({ name, arguments: args })
-          .catch(() => undefined);
+        await client.callTool({ name, arguments: args }).catch(() => undefined);
       return { ms: performance.now() - started, schemaTokens };
     } finally {
       await client.close();

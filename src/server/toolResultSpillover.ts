@@ -72,7 +72,11 @@ export class ToolResultSpilloverStore {
   }
 
   /** Read one page of a retained result; unknown ids return undefined. */
-  page(id: string, offset: number, limit: number): ToolResultSpilloverPage | undefined {
+  page(
+    id: string,
+    offset: number,
+    limit: number,
+  ): ToolResultSpilloverPage | undefined {
     const record = this.records.get(id);
     if (record === undefined) return undefined;
     const start = Math.min(Math.max(0, offset), record.text.length);

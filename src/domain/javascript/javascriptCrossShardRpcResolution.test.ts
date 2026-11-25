@@ -74,7 +74,10 @@ const facts = (
   ...overrides,
 });
 
-const clientMember = (member = "supabase", moduleKey: string | null = "100") => ({
+const clientMember = (
+  member = "supabase",
+  moduleKey: string | null = "100",
+) => ({
   member,
   module_key: moduleKey,
   location: at(2, 2),

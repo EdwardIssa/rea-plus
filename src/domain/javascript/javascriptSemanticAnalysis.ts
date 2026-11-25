@@ -102,10 +102,7 @@ import {
   electronMemberPath,
   ELECTRON_MODULE,
 } from "./javascriptElectronMemberWrites.js";
-import {
-  argumentValue,
-  range,
-} from "./javascriptStaticAnalysisHelpers.js";
+import { argumentValue, range } from "./javascriptStaticAnalysisHelpers.js";
 import type {
   JavaScriptRpcClientMemberFact,
   JavaScriptRpcExportProvenanceFact,
@@ -884,7 +881,11 @@ function* classifyDefinitionReceiversSteps(
       root = value;
       sourceMember = member;
     } else return;
-    if (root === undefined || !t.isIdentifier(root) || sourceMember === undefined)
+    if (
+      root === undefined ||
+      !t.isIdentifier(root) ||
+      sourceMember === undefined
+    )
       return;
     const binding = resolveSemanticBindingState(state, root, root.name);
     if (binding === undefined || !moduleLinkedInitializer(binding)) return;

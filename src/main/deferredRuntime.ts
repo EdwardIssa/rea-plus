@@ -137,9 +137,7 @@ export const runDeferred = async (
     layer: "server",
   });
   const profile = resolveMcpInputSchemaProfile(config.mcpInputSchemaProfile);
-  const surface = parseMcpToolSurface(
-    dependencies.env.REA_MCP_TOOL_SURFACE,
-  );
+  const surface = parseMcpToolSurface(dependencies.env.REA_MCP_TOOL_SURFACE);
   if (!surface.ok) throw surface.error;
   const toolSurfaceMode = surface.value ?? "lazy";
   let firstCatalog: RecordedMcpCatalog | undefined = readCatalog(profile);

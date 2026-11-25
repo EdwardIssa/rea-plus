@@ -458,8 +458,9 @@ export class EvidenceMcpServerCore extends RequestTrackingMcpServer {
     const inputSchema = project(entry.inputSchema, "input");
     if (inputSchema === undefined) return undefined;
     const rawOutput = project(entry.outputSchema, "output");
-    const compactPresentation =
-      compactPresentationForMcpOutputSchemaProfile(this.outputSchemaProfile);
+    const compactPresentation = compactPresentationForMcpOutputSchemaProfile(
+      this.outputSchemaProfile,
+    );
     const outputSchema =
       rawOutput === undefined || this.outputSchemaProfile === "off"
         ? undefined

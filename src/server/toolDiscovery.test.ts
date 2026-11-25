@@ -103,9 +103,9 @@ describe("McpToolSurface advertisement", () => {
     expect(surface.isInitiallyAdvertised(LOAD_TOOL_SCHEMA_TOOL_NAME)).toBe(
       true,
     );
-    expect(
-      surface.isInitiallyAdvertised(READ_TOOL_RESULT_PAGE_TOOL_NAME),
-    ).toBe(true);
+    expect(surface.isInitiallyAdvertised(READ_TOOL_RESULT_PAGE_TOOL_NAME)).toBe(
+      true,
+    );
     expect(surface.isInitiallyAdvertised("list_strings")).toBe(false);
     expect(surface.isInitiallyAdvertised("inspect_wasm_artifact")).toBe(false);
     expect(surface.discoveryEnabled).toBe(true);

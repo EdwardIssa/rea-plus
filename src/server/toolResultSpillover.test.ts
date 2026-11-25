@@ -90,7 +90,9 @@ describe("projectValueToSerializedBytes", () => {
     expect(parsed.detail.length).toBeLessThan(5000);
     expect(value.detail.startsWith(parsed.detail)).toBe(true);
     expect(parsed.entries.length).toBeLessThan(300);
-    expect(parsed.entries).toEqual(value.entries.slice(0, parsed.entries.length));
+    expect(parsed.entries).toEqual(
+      value.entries.slice(0, parsed.entries.length),
+    );
   });
 
   it("refuses a value whose keys alone exceed the target", () => {
@@ -145,12 +147,9 @@ describe("oversized plain result delivery with spillover", () => {
       },
       async () => delivery.toCallToolResult(ok(bigValue), contract),
     );
-    registerSpilloverTool(
-      (name, config, callback) => {
-        server.registerTool(name, config as never, callback as never);
-      },
-      server,
-    );
+    registerSpilloverTool((name, config, callback) => {
+      server.registerTool(name, config as never, callback as never);
+    }, server);
     const client = new Client({ name: "spillover-client", version: "1" });
     const [clientTransport, serverTransport] =
       InMemoryTransport.createLinkedPair();

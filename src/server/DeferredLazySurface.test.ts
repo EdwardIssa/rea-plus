@@ -94,9 +94,7 @@ it("serves discovery from the recorded catalog before materializing, then loads 
     expect(load.isError).not.toBe(true);
     expect(loads).toBe(0);
     const afterLoad = await client.listTools();
-    expect(afterLoad.tools.map(({ name }) => name)).toContain(
-      "fixture_needle",
-    );
+    expect(afterLoad.tools.map(({ name }) => name)).toContain("fixture_needle");
 
     const call = await client.callTool({
       name: "fixture_needle",

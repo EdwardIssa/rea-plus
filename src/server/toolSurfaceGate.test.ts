@@ -50,12 +50,9 @@ describe("authorization at execution (gate: revocation)", () => {
         };
       },
     );
-    registerDiscoveryTools(
-      (name, config, callback) => {
-        server.registerTool(name, config as never, callback as never);
-      },
-      server.toolSurface,
-    );
+    registerDiscoveryTools((name, config, callback) => {
+      server.registerTool(name, config as never, callback as never);
+    }, server.toolSurface);
     const client = await connect(server);
     try {
       const initial = await client.listTools();

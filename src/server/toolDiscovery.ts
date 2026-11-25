@@ -100,14 +100,82 @@ const sharesPrefix = (left: string, right: string): boolean =>
  * the whole catalog by prose overlap.
  */
 const QUERY_STOPWORDS: ReadonlySet<string> = new Set([
-  "a", "about", "am", "an", "and", "any", "are", "as", "at", "be", "been",
-  "between", "by", "can", "could", "did", "do", "does", "done", "for",
-  "from", "he", "her", "his", "how", "i", "if", "in", "into", "is", "it",
-  "its", "me", "my", "no", "not", "of", "on", "or", "our", "over", "per",
-  "shall", "she", "should", "so", "such", "than", "that", "the", "their",
-  "them", "then", "these", "they", "this", "those", "to", "under", "via",
-  "was", "we", "were", "what", "when", "where", "which", "who", "whom",
-  "whose", "why", "will", "with", "would", "you", "your",
+  "a",
+  "about",
+  "am",
+  "an",
+  "and",
+  "any",
+  "are",
+  "as",
+  "at",
+  "be",
+  "been",
+  "between",
+  "by",
+  "can",
+  "could",
+  "did",
+  "do",
+  "does",
+  "done",
+  "for",
+  "from",
+  "he",
+  "her",
+  "his",
+  "how",
+  "i",
+  "if",
+  "in",
+  "into",
+  "is",
+  "it",
+  "its",
+  "me",
+  "my",
+  "no",
+  "not",
+  "of",
+  "on",
+  "or",
+  "our",
+  "over",
+  "per",
+  "shall",
+  "she",
+  "should",
+  "so",
+  "such",
+  "than",
+  "that",
+  "the",
+  "their",
+  "them",
+  "then",
+  "these",
+  "they",
+  "this",
+  "those",
+  "to",
+  "under",
+  "via",
+  "was",
+  "we",
+  "were",
+  "what",
+  "when",
+  "where",
+  "which",
+  "who",
+  "whom",
+  "whose",
+  "why",
+  "will",
+  "with",
+  "would",
+  "you",
+  "your",
 ]);
 
 /**
@@ -323,10 +391,7 @@ const scoreEntry = (
         bestName.quality *
         rarityFactor(bestName.token, documentFrequency, entryCount) *
         (bestName.synonym ? SYNONYM_DISCOUNT : 1);
-      nameQuality += Math.min(
-        bestName.quality,
-        bestName.synonym ? 0.7 : 1,
-      );
+      nameQuality += Math.min(bestName.quality, bestName.synonym ? 0.7 : 1);
     }
     score += fieldScore(familyTokens, 5, true, false);
     score += fieldScore(textTokens, 3, false, true);
@@ -334,8 +399,7 @@ const scoreEntry = (
   // Coverage: a query that accounts for most of a short tool name is a
   // stronger intent signal than the same matches scattered across a
   // long one. Synonym and partial matches count at their quality.
-  if (nameTokens.size > 0)
-    score += 8 * (nameQuality / nameTokens.size);
+  if (nameTokens.size > 0) score += 8 * (nameQuality / nameTokens.size);
   return score;
 };
 
@@ -402,11 +466,7 @@ export class McpToolSurface {
     const indexed = this.host.entries().map(indexEntry);
     const documentFrequency = new Map<string, number>();
     for (const { nameTokens, familyTokens, textTokens } of indexed) {
-      const union = new Set([
-        ...nameTokens,
-        ...familyTokens,
-        ...textTokens,
-      ]);
+      const union = new Set([...nameTokens, ...familyTokens, ...textTokens]);
       for (const token of union)
         documentFrequency.set(token, (documentFrequency.get(token) ?? 0) + 1);
     }
@@ -506,7 +566,7 @@ const searchToolsInputSchema = z.object({
     .string()
     .min(1)
     .describe(
-      "Intent or name fragment to find tools by, for example \"decompile a function\" or \"wasm\".",
+      'Intent or name fragment to find tools by, for example "decompile a function" or "wasm".',
     ),
   limit: z
     .number()
